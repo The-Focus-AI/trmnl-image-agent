@@ -178,9 +178,9 @@ moon_phase: "waning crescent"
 
 ### Base Scene (always the same)
 ```
-Black and white pen and ink illustration in woodcut etching style for an e-ink display. Wide 16:9 landscape format.
+Illustration in woodcut/linocut style optimized for 4-gray e-ink display. Wide 16:9 landscape format. Use exactly 4 tones: white, light gray, dark gray, black.
 
-SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees covered in snow, ski lift chairs visible, and a skier carving down a groomed trail. Rocky outcrops and rolling hills of the Berkshires in background.
+SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees covered in snow (use light gray for snow-covered areas, dark gray for tree shadows), ski lift chairs visible, and a skier carving down a groomed trail. Rocky outcrops and rolling hills of the Berkshires in background. Sky in pure white, distant mountains in light gray, foreground elements with dark gray shadows.
 ```
 
 ### Left Side Signpost (varies based on alerts)
@@ -251,7 +251,7 @@ BOTTOM LEFT CORNER - Small text in a simple frame reading 'Updated {{TIMESTAMP}}
 
 ### Style Instructions (always the same)
 ```
-Style: Detailed crosshatching and line work for shading. Pure black ink on white background, no gray tones, no gradients. High contrast suitable for 1-bit e-ink display. Vintage ski poster aesthetic mixed with woodcut illustration style. All text must be clearly legible.
+Style: Illustration optimized for 4-gray e-ink display. Use exactly 4 tones: pure white, light gray, dark gray, and pure black. No gradients or smooth transitions - use flat areas of each tone. Woodcut/linocut aesthetic with bold shapes. Dark gray for shadows and depth, light gray for mid-tones and snow texture. Pure black for outlines, text, and darkest elements. Pure white for sky and highlights. All text must be clearly legible in pure black on white or light gray backgrounds. Vintage ski poster aesthetic.
 ```
 
 ---
@@ -261,9 +261,9 @@ Style: Detailed crosshatching and line work for shading. Pure black ink on white
 ### Example A: With Cold Advisory + Storm Watch (current conditions)
 
 ```
-Black and white pen and ink illustration in woodcut etching style for an e-ink display. Wide 16:9 landscape format.
+Illustration in woodcut/linocut style for 4-gray e-ink display. Wide 16:9 landscape format. Use exactly 4 tones: white, light gray, dark gray, black.
 
-SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees covered in snow, ski lift chairs visible, and a skier carving down a groomed trail. Rocky outcrops and rolling hills of the Berkshires in background.
+SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees covered in snow (light gray for snow, dark gray for shadows), ski lift chairs visible, and a skier carving down a groomed trail. Rocky outcrops and rolling hills of the Berkshires in background. White sky, light gray distant mountains, dark gray shadows.
 
 LEFT SIDE - Rustic wooden signpost with multiple signs showing:
 - 'FRI 23 JAN' (top sign, arrow style pointing right)
@@ -286,15 +286,15 @@ BOTTOM CENTER - Banner ribbon with 'STORM WATCH SAT-SUN • 13" EXPECTED'
 
 BOTTOM LEFT CORNER - Small text in a simple frame reading 'Updated 10:15 AM'
 
-Style: Detailed crosshatching and line work for shading. Pure black ink on white background, no gray tones, no gradients. High contrast suitable for 1-bit e-ink display. Vintage ski poster aesthetic mixed with woodcut illustration style. All text must be clearly legible.
+Style: 4-gray e-ink optimized. Use exactly 4 flat tones: white, light gray, dark gray, black. No gradients. Woodcut/linocut aesthetic with bold shapes. Text in pure black on white/light gray. Vintage ski poster style.
 ```
 
 ### Example B: No Alerts (nice day)
 
 ```
-Black and white pen and ink illustration in woodcut etching style for an e-ink display. Wide 16:9 landscape format.
+Illustration in woodcut/linocut style for 4-gray e-ink display. Wide 16:9 landscape format. Use exactly 4 tones: white, light gray, dark gray, black.
 
-SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees covered in snow, ski lift chairs visible, and a skier carving down a groomed trail. Rocky outcrops and rolling hills of the Berkshires in background.
+SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees covered in snow (light gray for snow, dark gray for shadows), ski lift chairs visible, and a skier carving down a groomed trail. Rocky outcrops and rolling hills of the Berkshires in background. White sky, light gray distant mountains, dark gray shadows.
 
 LEFT SIDE - Rustic wooden signpost with multiple signs showing:
 - 'SAT 25 JAN' (top sign, arrow style pointing right)
@@ -316,15 +316,15 @@ BOTTOM CENTER - Decorative pine branch border with small snowflakes
 
 BOTTOM LEFT CORNER - Small text in a simple frame reading 'Updated 8:30 AM'
 
-Style: Detailed crosshatching and line work for shading. Pure black ink on white background, no gray tones, no gradients. High contrast suitable for 1-bit e-ink display. Vintage ski poster aesthetic mixed with woodcut illustration style. All text must be clearly legible.
+Style: 4-gray e-ink optimized. Use exactly 4 flat tones: white, light gray, dark gray, black. No gradients. Woodcut/linocut aesthetic with bold shapes. Text in pure black on white/light gray. Vintage ski poster style.
 ```
 
 ### Example C: Winter Storm Warning (severe weather)
 
 ```
-Black and white pen and ink illustration in woodcut etching style for an e-ink display. Wide 16:9 landscape format.
+Illustration in woodcut/linocut style for 4-gray e-ink display. Wide 16:9 landscape format. Use exactly 4 tones: white, light gray, dark gray, black.
 
-SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees covered in snow, ski lift chairs visible, and a skier carving down a groomed trail. Rocky outcrops and rolling hills of the Berkshires in background. Heavy snowfall in the air.
+SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees covered in snow (light gray for snow, dark gray for shadows), ski lift chairs visible, and a skier carving down a groomed trail. Rocky outcrops and rolling hills of the Berkshires in background. White sky with light gray snowflakes scattered across scene to suggest heavy snowfall, dark gray shadows.
 
 LEFT SIDE - Rustic wooden signpost with multiple signs showing:
 - 'SUN 26 JAN' (top sign, arrow style pointing right)
@@ -347,7 +347,7 @@ BOTTOM CENTER - Large banner ribbon with '⚠ BLIZZARD CONDITIONS • 18" FALLIN
 
 BOTTOM LEFT CORNER - Small text in a simple frame reading 'Updated 11:45 AM'
 
-Style: Detailed crosshatching and line work for shading. Pure black ink on white background, no gray tones, no gradients. High contrast suitable for 1-bit e-ink display. Vintage ski poster aesthetic mixed with woodcut illustration style. All text must be clearly legible.
+Style: 4-gray e-ink optimized. Use exactly 4 flat tones: white, light gray, dark gray, black. No gradients. Woodcut/linocut aesthetic with bold shapes. Text in pure black on white/light gray. Vintage ski poster style.
 ```
 
 ### Example D: Powder Day (day after storm)
@@ -355,7 +355,7 @@ Style: Detailed crosshatching and line work for shading. Pure black ink on white
 ```
 Black and white pen and ink illustration in woodcut etching style for an e-ink display. Wide 16:9 landscape format.
 
-SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees heavily laden with fresh snow, ski lift chairs visible, and a skier spraying powder while carving down an ungroomed trail. Brilliant sunshine suggested by radiating lines. Rocky outcrops and rolling hills of the Berkshires in background.
+SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees heavily laden with fresh snow (bright white snow, light gray tree shadows), ski lift chairs visible, and a skier spraying powder while carving down an ungroomed trail. Brilliant sunshine suggested by white radiating lines on light gray sky. Rocky outcrops (dark gray) and rolling hills of the Berkshires in background (light gray).
 
 LEFT SIDE - Rustic wooden signpost with multiple signs showing:
 - 'MON 27 JAN' (top sign, arrow style pointing right)
@@ -377,7 +377,7 @@ BOTTOM CENTER - Celebratory banner ribbon with '❄ POWDER DAY • 15" FRESH ❄
 
 BOTTOM LEFT CORNER - Small text in a simple frame reading 'Updated 7:30 AM'
 
-Style: Detailed crosshatching and line work for shading. Pure black ink on white background, no gray tones, no gradients. High contrast suitable for 1-bit e-ink display. Vintage ski poster aesthetic mixed with woodcut illustration style. All text must be clearly legible.
+Style: 4-gray e-ink optimized. Use exactly 4 flat tones: white, light gray, dark gray, black. No gradients. Woodcut/linocut aesthetic with bold shapes. Text in pure black on white/light gray. Vintage ski poster style.
 ```
 
 ### Example E: Rain Warning (important for skiers!)
@@ -385,7 +385,7 @@ Style: Detailed crosshatching and line work for shading. Pure black ink on white
 ```
 Black and white pen and ink illustration in woodcut etching style for an e-ink display. Wide 16:9 landscape format.
 
-SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees covered in snow, ski lift chairs visible. Overcast sky suggested by horizontal line work. Rocky outcrops and rolling hills of the Berkshires in background.
+SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees covered in snow (light gray snow, dark gray shadows), ski lift chairs visible. Overcast sky in light gray (darker than usual to suggest clouds). Rocky outcrops (dark gray) and rolling hills of the Berkshires in background. Muted, flat lighting with less contrast to suggest dreary weather.
 
 LEFT SIDE - Rustic wooden signpost with multiple signs showing:
 - 'THU 30 JAN' (top sign, arrow style pointing right)
@@ -407,7 +407,7 @@ BOTTOM CENTER - Warning banner ribbon with '⚠ RAIN TONIGHT • ICY CONDITIONS 
 
 BOTTOM LEFT CORNER - Small text in a simple frame reading 'Updated 2:15 PM'
 
-Style: Detailed crosshatching and line work for shading. Pure black ink on white background, no gray tones, no gradients. High contrast suitable for 1-bit e-ink display. Vintage ski poster aesthetic mixed with woodcut illustration style. All text must be clearly legible.
+Style: 4-gray e-ink optimized. Use exactly 4 flat tones: white, light gray, dark gray, black. No gradients. Woodcut/linocut aesthetic with bold shapes. Text in pure black on white/light gray. Vintage ski poster style.
 ```
 
 ---
@@ -421,7 +421,7 @@ npx @the-focus-ai/nano-banana "YOUR_COMPLETE_PROMPT_HERE" \
   --output output/$(date +%Y-%m)/$(date +%Y-%m-%d-%H-%M)-full.png
 ```
 
-## Step 6: Resize for TRMNL
+## Step 6: Resize for TRMNL (4-gray palette)
 
 ```bash
 mkdir -p output/$(date +%Y-%m)
@@ -430,10 +430,13 @@ magick output/$(date +%Y-%m)/$(date +%Y-%m-%d-%H-%M)-full.png \
   -resize 800x480^ \
   -gravity center \
   -extent 800x480 \
-  -threshold 50% \
-  -type bilevel \
-  output/$(date +%Y-%m)/$(date +%Y-%m-%d-%H-%M).png
+  -colorspace Gray \
+  -colors 4 \
+  -depth 8 \
+  PNG8:output/$(date +%Y-%m)/$(date +%Y-%m-%d-%H-%M).png
 ```
+
+**Note:** This creates a 4-color grayscale image (black, dark gray, light gray, white) optimized for TRMNL's e-ink display.
 
 ## Step 7: Update README (ALWAYS DO THIS!)
 
