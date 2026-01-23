@@ -62,6 +62,34 @@ Extract:
 - Sunset: ~4:55-5:10 PM (increases ~1 min/day in late Jan)
 - Moon phase: Check current phase (new, waxing crescent, first quarter, waxing gibbous, full, waning gibbous, last quarter, waning crescent)
 
+### 1F. Upcoming Weather / Notable Events (CHECK THIS!)
+**Source:** https://forecast.weather.gov/MapClick.php?lat=41.8456&lon=-73.3284 + https://www.snow-forecast.com/resorts/Mohawk-Mountain/snow-report
+
+> WebFetch prompt: `Extract the extended forecast for the next 3-5 days. Look for any notable weather: significant snowfall (6"+), extreme cold (below 0°F), warming trends (above 40°F), rain events, or high winds (25+ mph).`
+
+**Notable conditions to highlight (in priority order):**
+
+| Condition | Threshold | Banner Text Example |
+|-----------|-----------|---------------------|
+| Major snowstorm | 12"+ expected | `MAJOR STORM SAT • 13" EXPECTED` |
+| Significant snow | 6-12" expected | `SNOW SAT-SUN • 8" EXPECTED` |
+| Extreme cold | Below -10°F wind chill | `EXTREME COLD FRI • -15°F` |
+| Powder day | Fresh snow + cold temps | `POWDER DAY • 6" FRESH` |
+| Warm spell | Above 40°F (melt risk) | `WARM SAT • 45°F - SPRING CONDITIONS` |
+| Rain event | Rain in forecast | `⚠️ RAIN SUN - ICY CONDITIONS LIKELY` |
+| High winds | 30+ mph sustained | `HIGH WINDS SAT • POSSIBLE LIFT DELAYS` |
+| Perfect ski day | Sunny, 20-32°F, fresh grooming | `BLUEBIRD DAY • PERFECT CONDITIONS` |
+
+**Decision logic for banner:**
+1. If there's an active NWS alert → show the alert
+2. Else if major storm (12"+) coming in next 48h → show storm forecast
+3. Else if significant snow (6"+) coming → show snow forecast
+4. Else if extreme cold/wind chill → show cold warning
+5. Else if rain coming → show rain warning (skiers want to know!)
+6. Else if it's a powder day (fresh snow overnight) → celebrate it!
+7. Else if perfect conditions → show "bluebird day"
+8. Else → show decorative pine branch (no notable weather)
+
 ---
 
 ## Step 2: Fill In Current Data
@@ -76,13 +104,37 @@ weather_advisory: "COLD ADVISORY"           # or empty if none
 storm_alert: "STORM WATCH SAT-SUN • 13\" EXPECTED"  # or empty
 mountain_alert: ""                          # e.g., "MOUNTAIN CLOSED" or "OPENS 12PM"
 
-# Weather
+# Weather - Current
 temperature: "25"
 conditions: "FAIR"
 wind_chill: "16"                            # or same as temp if no chill
 wind: "W 10-15 mph"
 high: "27"
 low: "-2"
+
+# Weather - Upcoming (next 3 days) - USE THIS FOR BANNER
+forecast:
+  - day: "SAT"
+    conditions: "SNOW"
+    high: "30"
+    low: "22"
+    snow_inches: 13                         # expected accumulation
+    notable: "MAJOR STORM"                  # or empty
+  - day: "SUN"
+    conditions: "SNOW"
+    high: "28"
+    low: "18"
+    snow_inches: 2
+    notable: ""
+  - day: "MON"
+    conditions: "SUNNY"
+    high: "25"
+    low: "10"
+    snow_inches: 0
+    notable: "POWDER DAY"                   # fresh snow from storm!
+
+# Derived: What to show in bottom banner (based on decision logic in 1F)
+banner_text: "MAJOR STORM SAT • 13\" EXPECTED"  # or empty for decorative border
 
 # Mohawk Mountain
 trails_open: "25"
@@ -144,22 +196,30 @@ BOTTOM RIGHT - Wooden ski conditions board showing:
 - '{{SURFACE}}'
 ```
 
-### Bottom Center Banner (varies based on alerts)
+### Bottom Center Banner (varies based on alerts/forecast)
 
-**If there IS a storm alert:**
-```
-BOTTOM CENTER - Banner ribbon with '{{STORM_ALERT}}'
-```
+Use the `banner_text` field from Step 2, which is determined by the decision logic in section 1F.
 
-**If there is a mountain alert but no storm:**
+**If `banner_text` is set (alert or notable weather):**
 ```
-BOTTOM CENTER - Banner ribbon with '{{MOUNTAIN_ALERT}}'
+BOTTOM CENTER - Banner ribbon with '{{BANNER_TEXT}}'
 ```
 
-**If there are NO alerts:**
+**If `banner_text` is empty (no notable weather):**
 ```
 BOTTOM CENTER - Decorative pine branch border with small snowflakes
 ```
+
+**Priority order for banner_text:**
+1. Active NWS alert (WINTER STORM WARNING, etc.)
+2. Mountain alert (CLOSED, DELAYED OPENING)
+3. Upcoming major storm (12"+)
+4. Upcoming significant snow (6"+)
+5. Extreme cold warning
+6. Rain warning
+7. Powder day celebration
+8. Bluebird/perfect day
+9. Empty (use decorative border)
 
 ### Bottom Left Timestamp (always)
 ```
@@ -263,6 +323,66 @@ BOTTOM RIGHT - Wooden ski conditions board showing:
 BOTTOM CENTER - Large banner ribbon with '⚠ BLIZZARD CONDITIONS • 18" FALLING'
 
 BOTTOM LEFT CORNER - Small text in a simple frame reading 'Updated 11:45 AM'
+
+Style: Detailed crosshatching and line work for shading. Pure black ink on white background, no gray tones, no gradients. High contrast suitable for 1-bit e-ink display. Vintage ski poster aesthetic mixed with woodcut illustration style. All text must be clearly legible.
+```
+
+### Example D: Powder Day (day after storm)
+
+```
+Black and white pen and ink illustration in woodcut etching style for an e-ink display. Wide 16:9 landscape format.
+
+SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees heavily laden with fresh snow, ski lift chairs visible, and a skier spraying powder while carving down an ungroomed trail. Brilliant sunshine suggested by radiating lines. Rocky outcrops and rolling hills of the Berkshires in background.
+
+LEFT SIDE - Rustic wooden signpost with multiple signs showing:
+- 'MON 27 JAN' (top sign, arrow style pointing right)
+- '22°F SUNNY' (middle sign)
+- 'HIGH 28°F / LOW 12°F' (lower sign)
+
+TOP RIGHT - Three framed icons in decorative vintage borders:
+- Sunrise icon with '7:07 AM'
+- Moon phase icon showing waxing gibbous moon
+- Sunset icon with '5:04 PM'
+
+BOTTOM RIGHT - Wooden ski conditions board showing:
+- 'MOHAWK MTN' as header
+- '27/27 TRAILS'
+- '45" BASE'
+- 'POWDER'
+
+BOTTOM CENTER - Celebratory banner ribbon with '❄ POWDER DAY • 15" FRESH ❄'
+
+BOTTOM LEFT CORNER - Small text in a simple frame reading 'Updated 7:30 AM'
+
+Style: Detailed crosshatching and line work for shading. Pure black ink on white background, no gray tones, no gradients. High contrast suitable for 1-bit e-ink display. Vintage ski poster aesthetic mixed with woodcut illustration style. All text must be clearly legible.
+```
+
+### Example E: Rain Warning (important for skiers!)
+
+```
+Black and white pen and ink illustration in woodcut etching style for an e-ink display. Wide 16:9 landscape format.
+
+SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees covered in snow, ski lift chairs visible. Overcast sky suggested by horizontal line work. Rocky outcrops and rolling hills of the Berkshires in background.
+
+LEFT SIDE - Rustic wooden signpost with multiple signs showing:
+- 'THU 30 JAN' (top sign, arrow style pointing right)
+- '38°F CLOUDY' (middle sign)
+- 'HIGH 42°F / LOW 34°F' (lower sign)
+
+TOP RIGHT - Three framed icons in decorative vintage borders:
+- Sunrise icon with '7:04 AM'
+- Moon phase icon showing new moon
+- Sunset icon with '5:08 PM'
+
+BOTTOM RIGHT - Wooden ski conditions board showing:
+- 'MOHAWK MTN' as header
+- '20/27 TRAILS'
+- '38" BASE'
+- 'VARIABLE'
+
+BOTTOM CENTER - Warning banner ribbon with '⚠ RAIN TONIGHT • ICY CONDITIONS FRI AM'
+
+BOTTOM LEFT CORNER - Small text in a simple frame reading 'Updated 2:15 PM'
 
 Style: Detailed crosshatching and line work for shading. Pure black ink on white background, no gray tones, no gradients. High contrast suitable for 1-bit e-ink display. Vintage ski poster aesthetic mixed with woodcut illustration style. All text must be clearly legible.
 ```
