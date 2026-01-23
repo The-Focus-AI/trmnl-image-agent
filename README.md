@@ -11,6 +11,22 @@ Generate and push custom images to TRMNL e-ink displays.
 - A TRMNL device
 - TRMNL account with Developer Edition add-on ($19 one-time)
 - Webhook Image plugin enabled
+- Claude Code with the following plugins:
+  - **nano-banana** - AI image generation using Google Gemini
+  - **chrome-driver** - Browser automation for screenshots
+
+### Install Claude Code Plugins
+
+```bash
+# Add the Focus.AI marketplace (one-time)
+/plugin marketplace add The-Focus-AI/claude-marketplace
+
+# Install required plugins
+/plugin install nano-banana@focus-marketplace
+/plugin install chrome-driver@focus-marketplace
+```
+
+Then restart Claude Code.
 
 ## Setup
 
@@ -24,11 +40,18 @@ export TRMNL_WEBHOOK_URL=$(op read "op://Development/Market TRMNL Webhook/notesP
 
 ## Usage
 
-### Push an Image
+Run the agent to generate a new image and push it to your TRMNL display:
 
 ```bash
-./push_to_trmnl.sh output/my-image.png
+claude --verbose -p --output-format=stream-json --dangerously-skip-permissions \
+  "update the image and push it to the display, then update the readme and commit and push everything"
 ```
+
+This will:
+1. Generate a new dashboard image using AI
+2. Push it to your TRMNL display via webhook
+3. Update the README with the latest image
+4. Commit and push changes to git
 
 ## Image Requirements
 
