@@ -525,20 +525,33 @@ file output/$(date +%Y-%m)/$(date +%Y-%m-%d-%H-%M).png
 
 ---
 
-## Step 7: Push to TRMNL
+## Step 7: Push to TRMNL Devices
 
-Use curl with `--data-binary` and `Content-Type: image/png` header:
+Push the image to **both** TRMNL devices using curl with `--data-binary` and `Content-Type: image/png` header.
+
+### 7a. Push to Market TRMNL
 
 ```bash
-export TRMNL_WEBHOOK_URL=$(op read "op://Personal/Market TRMNL Webhook/notesPlain")
+export MARKET_WEBHOOK=$(op read "op://Personal/Market TRMNL Webhook/notesPlain")
 
 curl -X POST \
   -H "Content-Type: image/png" \
   --data-binary @output/$(date +%Y-%m)/$(date +%Y-%m-%d-%H-%M).png \
-  "$TRMNL_WEBHOOK_URL"
+  "$MARKET_WEBHOOK"
 ```
 
-**Expected response:**
+### 7b. Push to Home TRMNL
+
+```bash
+export HOME_WEBHOOK=$(op read "op://Personal/Home TRMNL Webook/notesPlain")
+
+curl -X POST \
+  -H "Content-Type: image/png" \
+  --data-binary @output/$(date +%Y-%m)/$(date +%Y-%m-%d-%H-%M).png \
+  "$HOME_WEBHOOK"
+```
+
+**Expected response (for each):**
 ```json
 {"data":{"message":"Image uploaded successfully"}}
 ```
@@ -548,7 +561,7 @@ curl -X POST \
 - `"Unsupported image format"` - Ensure using PNG8 format with 8-bit colormap
 - `"No image data received"` - Don't use multipart form data; use `--data-binary` with Content-Type header
 
-**Limits:** 800x480 pixels, PNG/JPEG/BMP, **max 90KB**, 12 uploads/hour
+**Limits:** 800x480 pixels, PNG/JPEG/BMP, **max 90KB**, 12 uploads/hour per device
 
 ---
 
