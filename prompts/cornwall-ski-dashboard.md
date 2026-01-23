@@ -511,19 +511,44 @@ magick output/$(date +%Y-%m)/$(date +%Y-%m-%d-%H-%M)-full.png \
 - `-resize 800x480!` - Force exact 800x480 dimensions (the `!` ignores aspect ratio)
 - `-threshold 50%` - Convert to pure black/white (adjust if needed: higher = more white)
 - `-colors 2 -depth 1` - Ensure 1-bit color depth
-- `PNG8:` - Output as 8-bit PNG (compatible with TRMNL)
+- `PNG8:` - Output as 8-bit indexed PNG (compatible with TRMNL webhook)
+
+> ⚠️ **IMPORTANT:** The TRMNL webhook has a **90KB file size limit**. The PNG8 format with 2 colors typically produces files under 50KB, which is well within the limit. If your file is too large, increase the threshold or simplify the image.
+
+**Verify the output:**
+```bash
+ls -lh output/$(date +%Y-%m)/$(date +%Y-%m-%d-%H-%M).png
+file output/$(date +%Y-%m)/$(date +%Y-%m-%d-%H-%M).png
+# Should show: PNG image data, 800 x 480, 8-bit colormap, non-interlaced
+# File size should be under 90KB
+```
 
 ---
 
 ## Step 7: Push to TRMNL
 
+Use curl with `--data-binary` and `Content-Type: image/png` header:
+
 ```bash
 export TRMNL_WEBHOOK_URL=$(op read "op://Personal/Market TRMNL Webhook/notesPlain")
 
-./push_to_trmnl.sh output/$(date +%Y-%m)/$(date +%Y-%m-%d-%H-%M).png
+curl -X POST \
+  -H "Content-Type: image/png" \
+  --data-binary @output/$(date +%Y-%m)/$(date +%Y-%m-%d-%H-%M).png \
+  "$TRMNL_WEBHOOK_URL"
 ```
 
-**Limits:** 800x480 pixels max, PNG/JPEG/BMP, max 5MB, 12 uploads/hour
+**Expected response:**
+```json
+{"data":{"message":"Image uploaded successfully"}}
+```
+
+**Common errors:**
+- `"Image file size exceeds device limit (90 KB)"` - Re-run Step 6 with stricter compression
+- `"Unsupported image format"` - Ensure using PNG8 format with 8-bit colormap
+- `"No image data received"` - Don't use multipart form data; use `--data-binary` with Content-Type header
+
+**Limits:** 800x480 pixels, PNG/JPEG/BMP, **max 90KB**, 12 uploads/hour
 
 ---
 
