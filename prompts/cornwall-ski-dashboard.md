@@ -1,0 +1,384 @@
+# Cornwall CT / Mohawk Mountain TRMNL Dashboard
+
+## Step 1: Fetch Data (in this order of priority)
+
+### 1A. Weather Alerts (HIGHEST PRIORITY)
+**Source:** https://forecast.weather.gov/MapClick.php?lat=41.8456&lon=-73.3284
+
+> WebFetch prompt: `Extract any active weather alerts, watches, or warnings. Include the alert type, timeframe, and expected accumulation if mentioned.`
+
+Look for these alerts in order of severity:
+- **WINTER STORM WARNING** - Blizzard, ice storm, heavy snow imminent
+- **WINTER STORM WATCH** - Significant snow expected (note: extract expected inches)
+- **WIND CHILL ADVISORY/WARNING** - Dangerously cold
+- **COLD WEATHER ADVISORY** - Very cold temps
+- **WIND ADVISORY** - High winds
+- **FREEZE WARNING** - Below freezing temps
+
+Extract the timeframe (e.g., "SAT 7AM - SUN 7PM") and expected accumulation if mentioned.
+
+### 1B. Mohawk Mountain Alerts (HIGH PRIORITY)
+**Source:** https://www.onthesnow.com/connecticut/mohawk-mountain/skireport (primary) or https://www.skicentral.com/mohawkmountain-skireport.html (backup)
+
+> ⚠️ **Note:** The official mohawkmtn.com site loads data via JavaScript and doesn't work with WebFetch. Use OnTheSnow instead.
+
+Look for:
+- Mountain closures or delayed openings
+- Lift closures
+- Trail closures due to conditions
+- Any special notices
+
+### 1C. Current Weather
+**Source:** https://forecast.weather.gov/MapClick.php?lat=41.8456&lon=-73.3284
+
+> WebFetch prompt: `Extract current temperature, conditions, wind speed and direction, wind chill if any, today's high/low, and the forecast for the next 2 days.`
+
+Extract:
+- Current temperature (°F)
+- Conditions (Fair, Sunny, Cloudy, Snow, Rain, etc.)
+- Wind chill (if different from temp)
+- Wind speed and direction
+- Today's high/low
+
+### 1D. Ski Conditions
+**Source:** https://www.onthesnow.com/connecticut/mohawk-mountain/skireport (recommended)
+
+> WebFetch prompt: `Extract all current conditions: trails open, lifts open, base depth, new snow, snowmaking status, hours, and any alerts.`
+
+Extract:
+- Trails open (X of 27)
+- Base depth (inches)
+- Surface conditions (Groomed, Hard Pack, Powder, Variable)
+- Lifts operating (X of 8)
+- Recent snowfall
+
+### 1E. Sun/Moon
+**Source:** https://www.timeanddate.com/sun/usa/cornwall-ct or WebSearch
+
+> WebSearch query: `Cornwall CT sunrise sunset today moon phase`
+
+**Approximate for Cornwall CT (January):**
+- Sunrise: ~7:08-7:12 AM
+- Sunset: ~4:55-5:10 PM (increases ~1 min/day in late Jan)
+- Moon phase: Check current phase (new, waxing crescent, first quarter, waxing gibbous, full, waning gibbous, last quarter, waning crescent)
+
+---
+
+## Step 2: Fill In Current Data
+
+```yaml
+# Date/Time (auto from system)
+date: "FRI 23 JAN"
+timestamp: "10:15 AM"
+
+# ALERTS (Priority 1 - these drive the visual)
+weather_advisory: "COLD ADVISORY"           # or empty if none
+storm_alert: "STORM WATCH SAT-SUN • 13\" EXPECTED"  # or empty
+mountain_alert: ""                          # e.g., "MOUNTAIN CLOSED" or "OPENS 12PM"
+
+# Weather
+temperature: "25"
+conditions: "FAIR"
+wind_chill: "16"                            # or same as temp if no chill
+wind: "W 10-15 mph"
+high: "27"
+low: "-2"
+
+# Mohawk Mountain
+trails_open: "25"
+trails_total: "27"
+base_depth: "20"
+surface: "GROOMED"
+lifts_open: "6"
+
+# Sun/Moon
+sunrise: "7:10 AM"
+sunset: "4:58 PM"
+moon_phase: "waning crescent"
+```
+
+---
+
+## Step 3: Build the Prompt
+
+### Base Scene (always the same)
+```
+Black and white pen and ink illustration in woodcut etching style for an e-ink display. Wide 16:9 landscape format.
+
+SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees covered in snow, ski lift chairs visible, and a skier carving down a groomed trail. Rocky outcrops and rolling hills of the Berkshires in background.
+```
+
+### Left Side Signpost (varies based on alerts)
+
+**If there IS a weather advisory:**
+```
+LEFT SIDE - Rustic wooden signpost with multiple signs showing:
+- '{{DATE}}' (top sign, arrow style pointing right)
+- '{{TEMPERATURE}}°F {{CONDITIONS}}' (middle sign)
+- 'WIND CHILL {{WIND_CHILL}}°F' (lower sign)
+- Warning triangle sign with '⚠ {{WEATHER_ADVISORY}}'
+```
+
+**If there is NO weather advisory:**
+```
+LEFT SIDE - Rustic wooden signpost with multiple signs showing:
+- '{{DATE}}' (top sign, arrow style pointing right)
+- '{{TEMPERATURE}}°F {{CONDITIONS}}' (middle sign)
+- 'HIGH {{HIGH}}°F / LOW {{LOW}}°F' (lower sign)
+```
+
+### Top Right Icons (always the same structure)
+```
+TOP RIGHT - Three framed icons in decorative vintage borders:
+- Sunrise icon with '{{SUNRISE}}'
+- Moon phase icon showing {{MOON_PHASE}} moon
+- Sunset icon with '{{SUNSET}}'
+```
+
+### Bottom Right Ski Board (always the same structure)
+```
+BOTTOM RIGHT - Wooden ski conditions board showing:
+- 'MOHAWK MTN' as header
+- '{{TRAILS_OPEN}}/{{TRAILS_TOTAL}} TRAILS'
+- '{{BASE_DEPTH}}" BASE'
+- '{{SURFACE}}'
+```
+
+### Bottom Center Banner (varies based on alerts)
+
+**If there IS a storm alert:**
+```
+BOTTOM CENTER - Banner ribbon with '{{STORM_ALERT}}'
+```
+
+**If there is a mountain alert but no storm:**
+```
+BOTTOM CENTER - Banner ribbon with '{{MOUNTAIN_ALERT}}'
+```
+
+**If there are NO alerts:**
+```
+BOTTOM CENTER - Decorative pine branch border with small snowflakes
+```
+
+### Bottom Left Timestamp (always)
+```
+BOTTOM LEFT CORNER - Small text in a simple frame reading 'Updated {{TIMESTAMP}}'
+```
+
+### Style Instructions (always the same)
+```
+Style: Detailed crosshatching and line work for shading. Pure black ink on white background, no gray tones, no gradients. High contrast suitable for 1-bit e-ink display. Vintage ski poster aesthetic mixed with woodcut illustration style. All text must be clearly legible.
+```
+
+---
+
+## Step 4: Complete Prompt Examples
+
+### Example A: With Cold Advisory + Storm Watch (current conditions)
+
+```
+Black and white pen and ink illustration in woodcut etching style for an e-ink display. Wide 16:9 landscape format.
+
+SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees covered in snow, ski lift chairs visible, and a skier carving down a groomed trail. Rocky outcrops and rolling hills of the Berkshires in background.
+
+LEFT SIDE - Rustic wooden signpost with multiple signs showing:
+- 'FRI 23 JAN' (top sign, arrow style pointing right)
+- '25°F FAIR' (middle sign)
+- 'WIND CHILL 16°F' (lower sign)
+- Warning triangle sign with '⚠ COLD ADVISORY'
+
+TOP RIGHT - Three framed icons in decorative vintage borders:
+- Sunrise icon with '7:10 AM'
+- Moon phase icon showing waning crescent moon
+- Sunset icon with '4:58 PM'
+
+BOTTOM RIGHT - Wooden ski conditions board showing:
+- 'MOHAWK MTN' as header
+- '25/27 TRAILS'
+- '20" BASE'
+- 'GROOMED'
+
+BOTTOM CENTER - Banner ribbon with 'STORM WATCH SAT-SUN • 13" EXPECTED'
+
+BOTTOM LEFT CORNER - Small text in a simple frame reading 'Updated 10:15 AM'
+
+Style: Detailed crosshatching and line work for shading. Pure black ink on white background, no gray tones, no gradients. High contrast suitable for 1-bit e-ink display. Vintage ski poster aesthetic mixed with woodcut illustration style. All text must be clearly legible.
+```
+
+### Example B: No Alerts (nice day)
+
+```
+Black and white pen and ink illustration in woodcut etching style for an e-ink display. Wide 16:9 landscape format.
+
+SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees covered in snow, ski lift chairs visible, and a skier carving down a groomed trail. Rocky outcrops and rolling hills of the Berkshires in background.
+
+LEFT SIDE - Rustic wooden signpost with multiple signs showing:
+- 'SAT 25 JAN' (top sign, arrow style pointing right)
+- '32°F SUNNY' (middle sign)
+- 'HIGH 35°F / LOW 20°F' (lower sign)
+
+TOP RIGHT - Three framed icons in decorative vintage borders:
+- Sunrise icon with '7:08 AM'
+- Moon phase icon showing waxing gibbous moon
+- Sunset icon with '5:02 PM'
+
+BOTTOM RIGHT - Wooden ski conditions board showing:
+- 'MOHAWK MTN' as header
+- '27/27 TRAILS'
+- '28" BASE'
+- 'POWDER'
+
+BOTTOM CENTER - Decorative pine branch border with small snowflakes
+
+BOTTOM LEFT CORNER - Small text in a simple frame reading 'Updated 8:30 AM'
+
+Style: Detailed crosshatching and line work for shading. Pure black ink on white background, no gray tones, no gradients. High contrast suitable for 1-bit e-ink display. Vintage ski poster aesthetic mixed with woodcut illustration style. All text must be clearly legible.
+```
+
+### Example C: Winter Storm Warning (severe weather)
+
+```
+Black and white pen and ink illustration in woodcut etching style for an e-ink display. Wide 16:9 landscape format.
+
+SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees covered in snow, ski lift chairs visible, and a skier carving down a groomed trail. Rocky outcrops and rolling hills of the Berkshires in background. Heavy snowfall in the air.
+
+LEFT SIDE - Rustic wooden signpost with multiple signs showing:
+- 'SUN 26 JAN' (top sign, arrow style pointing right)
+- '28°F SNOW' (middle sign)
+- 'WIND CHILL 15°F' (lower sign)
+- Warning triangle sign with '⚠ WINTER STORM WARNING'
+
+TOP RIGHT - Three framed icons in decorative vintage borders:
+- Sunrise icon with '7:08 AM'
+- Moon phase icon showing waxing gibbous moon
+- Sunset icon with '5:02 PM'
+
+BOTTOM RIGHT - Wooden ski conditions board showing:
+- 'MOHAWK MTN' as header
+- '20/27 TRAILS'
+- '32" BASE'
+- 'POWDER'
+
+BOTTOM CENTER - Large banner ribbon with '⚠ BLIZZARD CONDITIONS • 18" FALLING'
+
+BOTTOM LEFT CORNER - Small text in a simple frame reading 'Updated 11:45 AM'
+
+Style: Detailed crosshatching and line work for shading. Pure black ink on white background, no gray tones, no gradients. High contrast suitable for 1-bit e-ink display. Vintage ski poster aesthetic mixed with woodcut illustration style. All text must be clearly legible.
+```
+
+---
+
+## Step 5: Generate Image
+
+```bash
+export GEMINI_API_KEY=$(op read "op://Development/Google AI Studio Key/notesPlain")
+
+npx @the-focus-ai/nano-banana "YOUR_COMPLETE_PROMPT_HERE" \
+  --output output/$(date +%Y-%m)/$(date +%Y-%m-%d-%H-%M)-full.png
+```
+
+## Step 6: Resize for TRMNL
+
+```bash
+mkdir -p output/$(date +%Y-%m)
+
+magick output/$(date +%Y-%m)/$(date +%Y-%m-%d-%H-%M)-full.png \
+  -resize 800x480^ \
+  -gravity center \
+  -extent 800x480 \
+  -threshold 50% \
+  -type bilevel \
+  output/$(date +%Y-%m)/$(date +%Y-%m-%d-%H-%M).png
+```
+
+---
+
+## Output File Structure
+
+```
+output/
+├── 2026-01/
+│   ├── 2026-01-23-09-52-full.png    # Original from nano-banana
+│   ├── 2026-01-23-09-52.png         # TRMNL-ready (800x480, 1-bit)
+│   ├── 2026-01-23-14-30-full.png
+│   ├── 2026-01-23-14-30.png
+│   └── ...
+├── 2026-02/
+│   └── ...
+└── latest.png -> 2026-01/2026-01-23-14-30.png
+```
+
+---
+
+## Data Sources Quick Reference
+
+| Data | URL | Status |
+|------|-----|--------|
+| Weather + Alerts | https://forecast.weather.gov/MapClick.php?lat=41.8456&lon=-73.3284 | ✅ Works |
+| Ski Conditions (Primary) | https://www.onthesnow.com/connecticut/mohawk-mountain/skireport | ✅ Works best |
+| Ski Conditions (Backup) | https://www.skicentral.com/mohawkmountain-skireport.html | ✅ Works |
+| Snow Forecast | https://www.snow-forecast.com/resorts/Mohawk-Mountain/snow-report | ✅ Works |
+| Trail Map | https://www.onthesnow.com/connecticut/mohawk-mountain/trailmap | ✅ Works |
+| Mohawk Official | https://www.mohawkmtn.com/snow-report/ | ⚠️ JS-loaded, unreliable |
+
+---
+
+## Data Fetching Notes
+
+### What Works
+
+**OnTheSnow (RECOMMENDED for ski conditions)**
+- URL: `https://www.onthesnow.com/connecticut/mohawk-mountain/skireport`
+- Returns: trails open (X of 27), lifts open (X of 8), base depth, hours, forecast
+- WebFetch prompt: `Extract all current conditions: trails open, lifts open, base depth, new snow, snowmaking status, hours, and any alerts.`
+
+**NWS Weather (RECOMMENDED for weather + alerts)**
+- URL: `https://forecast.weather.gov/MapClick.php?lat=41.8456&lon=-73.3284`
+- Returns: current temp, conditions, wind, alerts (winter storm watch/warning, etc.)
+- WebFetch prompt: `Extract current temperature, conditions, wind, any active weather alerts or warnings, and the forecast for the next 2 days.`
+
+**Snow-Forecast.com (good for predictions)**
+- URL: `https://www.snow-forecast.com/resorts/Mohawk-Mountain/snow-report`
+- Returns: snow forecasts, expected accumulation
+- WebFetch prompt: `Extract current snow depth, weather conditions, and snow forecast for the next few days including expected accumulation.`
+
+### What Doesn't Work
+
+**Mohawk Official Site (mohawkmtn.com)**
+- The `/snow-report/` page loads conditions via JavaScript
+- WebFetch returns empty HTML structure with no actual data
+- Use OnTheSnow or SkiCentral instead
+
+### Sample Data (January 2026)
+
+From OnTheSnow on 2026-01-23:
+```yaml
+status: "Open"
+trails_open: 16
+trails_total: 27
+lifts_open: 6
+lifts_total: 8
+base_depth: 20  # inches mid-mountain
+hours:
+  mon_thu: "10am-8pm"
+  friday: "10am-10pm"
+  saturday: "8:30am-10pm"
+  sunday: "8:30am-4pm"
+night_skiing: "12 trails, 4pm start"
+forecast_snow:
+  - date: "Jan 25"
+    inches: 13
+  - date: "Jan 26"
+    inches: 2
+```
+
+### Resort Facts (static)
+- Summit elevation: 1,600 ft
+- Vertical drop: 650 ft
+- Skiable terrain: 107 acres
+- Total trails: 27 (use 27 as trails_total)
+- Total lifts: 8 (use 8 as lifts_total)
+- Night skiing: 12 trails
+- Snowmaking: 95% terrain coverage
+- Founded: 1947 (CT's oldest ski area)
