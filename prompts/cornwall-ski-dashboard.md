@@ -4,7 +4,15 @@
 
 ## ⚠️ CRITICAL: Always Do These First!
 
-### Step 0: Get Current Date & Time (ALWAYS DO THIS FIRST!)
+### Step 0a: Kill Chrome Browser (if needed)
+
+Before using chrome-driver to fetch ski conditions, kill any existing Chrome instances to avoid WebSocket errors:
+
+```bash
+pkill -f "Google Chrome" || true; sleep 2
+```
+
+### Step 0b: Get Current Date & Time (ALWAYS DO THIS FIRST!)
 
 **Run this command to get the current date and time:**
 ```bash
@@ -41,32 +49,52 @@ Look for these alerts in order of severity:
 Extract the timeframe (e.g., "SAT 7AM - SUN 7PM") and expected accumulation if mentioned.
 
 ### 1B. Mohawk Mountain Alerts (HIGH PRIORITY)
-**Source:** https://www.onthesnow.com/connecticut/mohawk-mountain/skireport (primary) or https://www.skicentral.com/mohawkmountain-skireport.html (backup)
+**Source:** https://www.mohawkmtn.com/snow-report/ (use chrome-driver)
 
-> ⚠️ **Note:** The official mohawkmtn.com site loads data via JavaScript and doesn't work with WebFetch. Use OnTheSnow instead.
+> ⚠️ **Note:** Use chrome-driver to fetch from the official site. Kill Chrome first if needed.
 
-Look for:
+```bash
+pkill -f "Google Chrome" || true; sleep 2
+/Users/wschenk/.claude/plugins/cache/focus-marketplace/chrome-driver/0.1.0/bin/extract "https://www.mohawkmtn.com/snow-report/" --format=text
+```
+
+Look for in "Today's Inside Scoop" section:
 - Mountain closures or delayed openings
 - Lift closures
 - Trail closures due to conditions
 - Any special notices
+- Today's high temperature (shown in the conditions text)
 
 ### 1C. Current Weather
 **Source:** https://forecast.weather.gov/MapClick.php?lat=41.8456&lon=-73.3284
 
-> WebFetch prompt: `Extract current temperature, conditions, wind speed and direction, wind chill if any, today's high/low, and the forecast for the next 2 days.`
+> WebFetch prompt: `Extract current temperature, conditions, wind speed and direction, wind chill if any, today's high temperature, tonight's low temperature, and the forecast for the next 2 days with their high and low temperatures.`
 
 Extract:
 - Current temperature (°F)
 - Conditions (Fair, Sunny, Cloudy, Snow, Rain, etc.)
 - Wind chill (if different from temp)
 - Wind speed and direction
-- Today's high/low
+- **Today's HIGH temperature** (°F)
+- **Tonight's LOW temperature** (°F)
 
 ### 1D. Ski Conditions
-**Source:** https://www.onthesnow.com/connecticut/mohawk-mountain/skireport (recommended)
+**Source:** https://www.mohawkmtn.com/snow-report/ (official site - requires chrome-driver)
 
-> WebFetch prompt: `Extract all current conditions: trails open, lifts open, base depth, new snow, snowmaking status, hours, and any alerts.`
+> ⚠️ **Note:** The official mohawkmtn.com site loads data via JavaScript. Use chrome-driver to fetch this data:
+
+```bash
+# Kill any existing Chrome first
+pkill -f "Google Chrome" || true; sleep 2
+
+# Extract the page content using chrome-driver
+/Users/wschenk/.claude/plugins/cache/focus-marketplace/chrome-driver/0.1.0/bin/extract "https://www.mohawkmtn.com/snow-report/" --format=text
+```
+
+Or take a screenshot and read visually:
+```bash
+/Users/wschenk/.claude/plugins/cache/focus-marketplace/chrome-driver/0.1.0/bin/screenshot "https://www.mohawkmtn.com/snow-report/" /tmp/mohawk-snow-report.png --full-page
+```
 
 Extract:
 - Trails open (X of 27)
@@ -74,6 +102,8 @@ Extract:
 - Surface conditions (Groomed, Hard Pack, Powder, Variable)
 - Lifts operating (X of 8)
 - Recent snowfall
+- Today's high/low temperature from the page
+- Hours of operation
 
 ### 1E. Sun/Moon
 **Source:** https://www.timeanddate.com/sun/usa/cornwall-ct or WebSearch
@@ -412,31 +442,32 @@ Style: 4-gray e-ink optimized. Use exactly 4 flat tones: white, light gray, dark
 
 ---
 
-## Step 5: Generate Image
+## Step 5: Generate Image (Exact Size for TRMNL)
+
+> ⚠️ **IMPORTANT:** Generate the image at exactly 800x480 pixels to avoid cropping/resizing issues. Use the `--width` and `--height` flags.
 
 ```bash
 export GEMINI_API_KEY=$(op read "op://Development/Google AI Studio Key/notesPlain")
 
+mkdir -p output/$(date +%Y-%m)
+
 npx @the-focus-ai/nano-banana "YOUR_COMPLETE_PROMPT_HERE" \
+  --width 800 \
+  --height 480 \
   --output output/$(date +%Y-%m)/$(date +%Y-%m-%d-%H-%M)-full.png
 ```
 
-## Step 6: Resize for TRMNL (4-gray palette)
+## Step 6: Convert to 4-Gray Palette for TRMNL
 
 ```bash
-mkdir -p output/$(date +%Y-%m)
-
 magick output/$(date +%Y-%m)/$(date +%Y-%m-%d-%H-%M)-full.png \
-  -resize 800x480^ \
-  -gravity center \
-  -extent 800x480 \
   -colorspace Gray \
   -colors 4 \
   -depth 8 \
   PNG8:output/$(date +%Y-%m)/$(date +%Y-%m-%d-%H-%M).png
 ```
 
-**Note:** This creates a 4-color grayscale image (black, dark gray, light gray, white) optimized for TRMNL's e-ink display.
+**Note:** Since we generated at exact 800x480, no resizing is needed. This just converts to the 4-color grayscale palette optimized for TRMNL's e-ink display.
 
 ## Step 7: Update README (ALWAYS DO THIS!)
 
@@ -479,14 +510,13 @@ output/
 
 ## Data Sources Quick Reference
 
-| Data | URL | Status |
-|------|-----|--------|
-| Weather + Alerts | https://forecast.weather.gov/MapClick.php?lat=41.8456&lon=-73.3284 | ✅ Works |
-| Ski Conditions (Primary) | https://www.onthesnow.com/connecticut/mohawk-mountain/skireport | ✅ Works best |
-| Ski Conditions (Backup) | https://www.skicentral.com/mohawkmountain-skireport.html | ✅ Works |
-| Snow Forecast | https://www.snow-forecast.com/resorts/Mohawk-Mountain/snow-report | ✅ Works |
-| Trail Map | https://www.onthesnow.com/connecticut/mohawk-mountain/trailmap | ✅ Works |
-| Mohawk Official | https://www.mohawkmtn.com/snow-report/ | ⚠️ JS-loaded, unreliable |
+| Data | URL | Method | Status |
+|------|-----|--------|--------|
+| Weather + Alerts | https://forecast.weather.gov/MapClick.php?lat=41.8456&lon=-73.3284 | WebFetch | ✅ Works |
+| Ski Conditions (Primary) | https://www.mohawkmtn.com/snow-report/ | chrome-driver | ✅ Works (kill Chrome first) |
+| Ski Conditions (Backup) | https://www.onthesnow.com/connecticut/mohawk-mountain/skireport | WebFetch | ✅ Works |
+| Snow Forecast | https://www.snow-forecast.com/resorts/Mohawk-Mountain/snow-report | WebFetch | ✅ Works |
+| Trail Map | https://www.onthesnow.com/connecticut/mohawk-mountain/trailmap | WebFetch | ✅ Works |
 
 ---
 
@@ -494,49 +524,57 @@ output/
 
 ### What Works
 
-**OnTheSnow (RECOMMENDED for ski conditions)**
-- URL: `https://www.onthesnow.com/connecticut/mohawk-mountain/skireport`
-- Returns: trails open (X of 27), lifts open (X of 8), base depth, hours, forecast
-- WebFetch prompt: `Extract all current conditions: trails open, lifts open, base depth, new snow, snowmaking status, hours, and any alerts.`
+**Mohawk Official Site (RECOMMENDED for ski conditions - use chrome-driver)**
+- URL: `https://www.mohawkmtn.com/snow-report/`
+- Method: chrome-driver (NOT WebFetch - page loads via JavaScript)
+- Returns: trails open, lifts open, base depth, surface conditions, hours, high/low temps
+- **Important:** Kill Chrome before fetching to avoid WebSocket errors:
+  ```bash
+  pkill -f "Google Chrome" || true; sleep 2
+  /Users/wschenk/.claude/plugins/cache/focus-marketplace/chrome-driver/0.1.0/bin/extract "https://www.mohawkmtn.com/snow-report/" --format=text
+  ```
+- Or take a screenshot: `/Users/wschenk/.claude/plugins/cache/focus-marketplace/chrome-driver/0.1.0/bin/screenshot "https://www.mohawkmtn.com/snow-report/" /tmp/mohawk.png --full-page`
 
 **NWS Weather (RECOMMENDED for weather + alerts)**
 - URL: `https://forecast.weather.gov/MapClick.php?lat=41.8456&lon=-73.3284`
 - Returns: current temp, conditions, wind, alerts (winter storm watch/warning, etc.)
-- WebFetch prompt: `Extract current temperature, conditions, wind, any active weather alerts or warnings, and the forecast for the next 2 days.`
+- WebFetch prompt: `Extract current temperature, conditions, wind, any active weather alerts or warnings, and the forecast for the next 2 days including high and low temperatures.`
+
+**OnTheSnow (BACKUP for ski conditions)**
+- URL: `https://www.onthesnow.com/connecticut/mohawk-mountain/skireport`
+- Returns: trails open (X of 27), lifts open (X of 8), base depth, hours, forecast
+- WebFetch prompt: `Extract all current conditions: trails open, lifts open, base depth, new snow, snowmaking status, hours, and any alerts.`
 
 **Snow-Forecast.com (good for predictions)**
 - URL: `https://www.snow-forecast.com/resorts/Mohawk-Mountain/snow-report`
 - Returns: snow forecasts, expected accumulation
 - WebFetch prompt: `Extract current snow depth, weather conditions, and snow forecast for the next few days including expected accumulation.`
 
-### What Doesn't Work
-
-**Mohawk Official Site (mohawkmtn.com)**
-- The `/snow-report/` page loads conditions via JavaScript
-- WebFetch returns empty HTML structure with no actual data
-- Use OnTheSnow or SkiCentral instead
-
 ### Sample Data (January 2026)
 
-From OnTheSnow on 2026-01-23:
+From mohawkmtn.com on 2026-01-23 (via chrome-driver):
 ```yaml
 status: "Open"
+last_updated: "Friday, January 23, 2026 at 7:31 AM"
+todays_high: 27  # from "Today's Inside Scoop"
 trails_open: 16
 trails_total: 27
-lifts_open: 6
+lifts_open: 4
 lifts_total: 8
-base_depth: 20  # inches mid-mountain
-hours:
-  mon_thu: "10am-8pm"
-  friday: "10am-10pm"
-  saturday: "8:30am-10pm"
-  sunday: "8:30am-4pm"
-night_skiing: "12 trails, 4pm start"
-forecast_snow:
-  - date: "Jan 25"
-    inches: 13
-  - date: "Jan 26"
-    inches: 2
+surface: "Variable Conditions (machine groomed)"
+hours: "10:00am - 8:30pm"
+night_skiing: "Available on multiple trails"
+tubing: "Open 10AM to post-sunset"
+```
+
+From NWS forecast.weather.gov:
+```yaml
+current_temp: 25
+conditions: "Fair"
+wind_chill: 16
+wind: "W 10-15 mph"
+today_high: 27
+tonight_low: -2
 ```
 
 ### Resort Facts (static)
