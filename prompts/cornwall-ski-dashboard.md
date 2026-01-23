@@ -1,5 +1,28 @@
 # Cornwall CT / Mohawk Mountain TRMNL Dashboard
 
+---
+
+## ⚠️ CRITICAL: Always Do These First!
+
+### Step 0: Get Current Date & Time (ALWAYS DO THIS FIRST!)
+
+**Run this command to get the current date and time:**
+```bash
+date "+%a %d %b %Y %I:%M %p"
+```
+
+This gives you the exact values for:
+- `date`: Format as "DAY DD MON" (e.g., "THU 23 JAN")
+- `timestamp`: Format as "HH:MM AM/PM" (e.g., "2:45 PM")
+
+**Example output:** `Thu 23 Jan 2026 02:45 PM`
+- Use `THU 23 JAN` for the date sign
+- Use `2:45 PM` for the timestamp
+
+> ⚠️ **NEVER use hardcoded or example dates!** Always fetch the real current time.
+
+---
+
 ## Step 1: Fetch Data (in this order of priority)
 
 ### 1A. Weather Alerts (HIGHEST PRIORITY)
@@ -95,9 +118,9 @@ Extract:
 ## Step 2: Fill In Current Data
 
 ```yaml
-# Date/Time (auto from system)
-date: "FRI 23 JAN"
-timestamp: "10:15 AM"
+# Date/Time (FROM STEP 0 - use actual current time!)
+date: "THU 23 JAN"        # From: date "+%a %d %b" | tr '[:lower:]' '[:upper:]'
+timestamp: "2:45 PM"      # From: date "+%I:%M %p"
 
 # ALERTS (Priority 1 - these drive the visual)
 weather_advisory: "COLD ADVISORY"           # or empty if none
@@ -411,6 +434,26 @@ magick output/$(date +%Y-%m)/$(date +%Y-%m-%d-%H-%M)-full.png \
   -type bilevel \
   output/$(date +%Y-%m)/$(date +%Y-%m-%d-%H-%M).png
 ```
+
+## Step 7: Update README (ALWAYS DO THIS!)
+
+After generating a new image, **always update README.md** to show the latest image:
+
+1. **Update the image path in README.md:**
+   - Find the line: `![Latest TRMNL Image](output/...)`
+   - Replace with the path to your new TRMNL-ready image (the resized one, not the -full.png)
+
+2. **Example:**
+   ```markdown
+   ![Latest TRMNL Image](output/2026-01/2026-01-23-14-45.png)
+   ```
+
+3. **Update the symlink (optional but helpful locally):**
+   ```bash
+   ln -sf 2026-01/2026-01-23-14-45.png output/latest.png
+   ```
+
+> ⚠️ **GitHub doesn't follow symlinks**, so the README must point to the actual file path, not `output/latest.png`
 
 ---
 
