@@ -1,5 +1,7 @@
 # Cornwall CT / Mohawk Mountain TRMNL Dashboard
 
+> **PURPOSE:** This dashboard helps skiers plan their trips to Mohawk Mountain. The most important information is **upcoming weather events** - storms, extreme cold, rain - that affect skiing conditions and safety.
+
 ---
 
 ## ⚠️ CRITICAL: Always Do These First!
@@ -31,121 +33,97 @@ This gives you the exact values for:
 
 ---
 
-## Step 1: Fetch Data (in this order of priority)
+## Step 1: Fetch Data (Run as Parallel Subagents)
 
-### 1A. Weather Alerts (HIGHEST PRIORITY)
+> **Run these two data fetches in parallel as subagents for faster results.**
+
+### 1A. Fetch Weather Data (Subagent 1)
+
+**Prompt file:** `prompts/fetch-weather.md`
+
+Use WebFetch to get data from NWS:
+- Current temperature, conditions, wind, wind chill
+- Today's HIGH and LOW temperatures
+- Active alerts (WINTER STORM WARNING, WATCH, etc.)
+- Extended forecast (next 3-5 days)
+- Snow predictions (especially important!)
+
 **Source:** https://forecast.weather.gov/MapClick.php?lat=41.8456&lon=-73.3284
 
-> WebFetch prompt: `Extract any active weather alerts, watches, or warnings. Include the alert type, timeframe, and expected accumulation if mentioned.`
+### 1B. Fetch Mohawk Conditions (Subagent 2)
 
-Look for these alerts in order of severity:
-- **WINTER STORM WARNING** - Blizzard, ice storm, heavy snow imminent
-- **WINTER STORM WATCH** - Significant snow expected (note: extract expected inches)
-- **WIND CHILL ADVISORY/WARNING** - Dangerously cold
-- **COLD WEATHER ADVISORY** - Very cold temps
-- **WIND ADVISORY** - High winds
-- **FREEZE WARNING** - Below freezing temps
+**Prompt file:** `prompts/fetch-mohawk.md`
 
-Extract the timeframe (e.g., "SAT 7AM - SUN 7PM") and expected accumulation if mentioned.
-
-### 1B. Mohawk Mountain Alerts (HIGH PRIORITY)
-**Source:** https://www.mohawkmtn.com/snow-report/ (use chrome-driver)
-
-> ⚠️ **Note:** Use chrome-driver to fetch from the official site. Kill Chrome first if needed.
-
-```bash
-pkill -f "Google Chrome" || true; sleep 2
-/Users/wschenk/.claude/plugins/cache/focus-marketplace/chrome-driver/0.1.0/bin/extract "https://www.mohawkmtn.com/snow-report/" --format=text
-```
-
-Look for in "Today's Inside Scoop" section:
-- Mountain closures or delayed openings
-- Lift closures
-- Trail closures due to conditions
-- Any special notices
-- Today's high temperature (shown in the conditions text)
-
-### 1C. Current Weather
-**Source:** https://forecast.weather.gov/MapClick.php?lat=41.8456&lon=-73.3284
-
-> WebFetch prompt: `Extract current temperature, conditions, wind speed and direction, wind chill if any, today's high temperature, tonight's low temperature, and the forecast for the next 2 days with their high and low temperatures.`
-
-Extract:
-- Current temperature (°F)
-- Conditions (Fair, Sunny, Cloudy, Snow, Rain, etc.)
-- Wind chill (if different from temp)
-- Wind speed and direction
-- **Today's HIGH temperature** (°F)
-- **Tonight's LOW temperature** (°F)
-
-### 1D. Ski Conditions
-**Source:** https://www.mohawkmtn.com/snow-report/ (official site - requires chrome-driver)
-
-> ⚠️ **Note:** The official mohawkmtn.com site loads data via JavaScript. Use chrome-driver to fetch this data:
-
-```bash
-# Kill any existing Chrome first
-pkill -f "Google Chrome" || true; sleep 2
-
-# Extract the page content using chrome-driver
-/Users/wschenk/.claude/plugins/cache/focus-marketplace/chrome-driver/0.1.0/bin/extract "https://www.mohawkmtn.com/snow-report/" --format=text
-```
-
-Or take a screenshot and read visually:
-```bash
-/Users/wschenk/.claude/plugins/cache/focus-marketplace/chrome-driver/0.1.0/bin/screenshot "https://www.mohawkmtn.com/snow-report/" /tmp/mohawk-snow-report.png --full-page
-```
-
-Extract:
+Use chrome-driver to get data from Mohawk (requires killing Chrome first):
 - Trails open (X of 27)
-- Base depth (inches)
-- Surface conditions (Groomed, Hard Pack, Powder, Variable)
-- Lifts operating (X of 8)
-- Recent snowfall
-- Today's high/low temperature from the page
+- Lifts open (X of 8)
+- Surface conditions
+- Mountain alerts (closures, delayed openings)
 - Hours of operation
 
-### 1E. Sun/Moon
-**Source:** https://www.timeanddate.com/sun/usa/cornwall-ct or WebSearch
+**Source:** https://www.mohawkmtn.com/snow-report/
+
+```bash
+# Kill Chrome first!
+pkill -f "Google Chrome" || true; sleep 2
+```
+
+### 1C. Sun/Moon (Quick lookup)
 
 > WebSearch query: `Cornwall CT sunrise sunset today moon phase`
 
 **Approximate for Cornwall CT (January):**
 - Sunrise: ~7:08-7:12 AM
 - Sunset: ~4:55-5:10 PM (increases ~1 min/day in late Jan)
-- Moon phase: Check current phase (new, waxing crescent, first quarter, waxing gibbous, full, waning gibbous, last quarter, waning crescent)
 
-### 1F. Upcoming Weather / Notable Events (CHECK THIS!)
-**Source:** https://forecast.weather.gov/MapClick.php?lat=41.8456&lon=-73.3284 + https://www.snow-forecast.com/resorts/Mohawk-Mountain/snow-report
+---
 
-> WebFetch prompt: `Extract the extended forecast for the next 3-5 days. Look for any notable weather: significant snowfall (6"+), extreme cold (below 0°F), warming trends (above 40°F), rain events, or high winds (25+ mph).`
+## Banner Decision Logic
 
-**Notable conditions to highlight (in priority order):**
+Based on the data from subagents, determine what to show in the bottom banner.
 
-| Condition | Threshold | Banner Text Example |
-|-----------|-----------|---------------------|
-| Major snowstorm | 12"+ expected | `MAJOR STORM SAT • 13" EXPECTED` |
-| Significant snow | 6-12" expected | `SNOW SAT-SUN • 8" EXPECTED` |
-| Extreme cold | Below -10°F wind chill | `EXTREME COLD FRI • -15°F` |
-| Powder day | Fresh snow + cold temps | `POWDER DAY • 6" FRESH` |
-| Warm spell | Above 40°F (melt risk) | `WARM SAT • 45°F - SPRING CONDITIONS` |
-| Rain event | Rain in forecast | `⚠️ RAIN SUN - ICY CONDITIONS LIKELY` |
-| High winds | 30+ mph sustained | `HIGH WINDS SAT • POSSIBLE LIFT DELAYS` |
-| Perfect ski day | Sunny, 20-32°F, fresh grooming | `BLUEBIRD DAY • PERFECT CONDITIONS` |
+> **IMPORTANT:** The banner is the MOST VISIBLE part of the display. Use it to communicate the MOST IMPORTANT weather information - especially upcoming storms, extreme cold, or hazardous conditions.
 
-**Decision logic for banner:**
-1. If there's an active NWS alert → show the alert
-2. Else if major storm (12"+) coming in next 48h → show storm forecast
-3. Else if significant snow (6"+) coming → show snow forecast
-4. Else if extreme cold/wind chill → show cold warning
-5. Else if rain coming → show rain warning (skiers want to know!)
-6. Else if it's a powder day (fresh snow overnight) → celebrate it!
-7. Else if perfect conditions → show "bluebird day"
-8. Else → show decorative pine branch (no notable weather)
+| Priority | Condition | Threshold | Banner Text Example |
+|----------|-----------|-----------|---------------------|
+| 1 | Active NWS alert | Any active | `⚠ WINTER STORM WARNING IN EFFECT` |
+| 2 | Mountain alert | Closure/delay | `MOUNTAIN CLOSED` or `OPENS 12PM` |
+| 3 | Major snowstorm coming | 8"+ expected in next 48h | `BIG STORM SUN • 8-12" EXPECTED` |
+| 4 | Extreme cold coming | Below 0°F or -10°F wind chill | `BITTER COLD SAT • LOW -5°F` |
+| 5 | Storm + Cold combo | Both in forecast | `STORM SUN + FRIGID MON • BUNDLE UP!` |
+| 6 | Significant snow | 4-8" expected | `SNOW SUN • 6" EXPECTED` |
+| 7 | Rain event | Rain in forecast | `⚠ RAIN SUN - ICY CONDITIONS LIKELY` |
+| 8 | Powder day | Fresh snow + cold temps | `POWDER DAY • 6" FRESH` |
+| 9 | Perfect day | Sunny, 20-32°F | `BLUEBIRD DAY • PERFECT CONDITIONS` |
+| 10 | None | No notable weather | Decorative pine branch border |
+
+### Combining Multiple Weather Events
+
+When multiple significant events are coming, combine them in the banner:
+- Storm + Cold: `STORM SUN 8" • THEN BITTER COLD MON`
+- Cold + Wind: `EXTREME COLD SAT • WIND CHILL -15°F`
+- Storm timing: `HEAVY SNOW SUN PM - MON AM • 10" TOTAL`
 
 ---
 
 ## Step 2: Fill In Current Data
+
+**KEY INFORMATION TO DISPLAY (in priority order):**
+
+> **The display should answer: "What do I need to know before going skiing?"**
+
+1. **UPCOMING MAJOR WEATHER** (most important!)
+   - Big storms coming (when? how much snow?)
+   - Extreme cold/wind chill warnings
+   - Rain events that could affect conditions
+2. Current temperature + conditions + wind chill
+3. High/Low temperatures for today
+4. Active weather advisories (WINTER STORM WARNING, etc.)
+5. Mountain alerts (closures, delayed openings)
+6. Sunrise and sunset times
+7. Trail/lift status from Mohawk
+
+**If a major storm is coming this weekend, THAT should be the main message!**
 
 ```yaml
 # Date/Time (FROM STEP 0 - use actual current time!)
@@ -166,35 +144,43 @@ high: "27"
 low: "-2"
 
 # Weather - Upcoming (next 3 days) - USE THIS FOR BANNER
+# LOOK FOR: storms, extreme cold, rain - these are what skiers need to know!
 forecast:
+  - day: "FRI"
+    conditions: "PARTLY CLOUDY"
+    high: "28"
+    low: "12"
+    snow_inches: 0
+    notable: ""
   - day: "SAT"
-    conditions: "SNOW"
-    high: "30"
+    conditions: "CLOUDY"
+    high: "32"
     low: "22"
-    snow_inches: 13                         # expected accumulation
-    notable: "MAJOR STORM"                  # or empty
+    snow_inches: 0
+    notable: ""
   - day: "SUN"
     conditions: "SNOW"
-    high: "28"
+    high: "30"
     low: "18"
-    snow_inches: 2
-    notable: ""
+    snow_inches: 10                         # BIG STORM COMING!
+    notable: "MAJOR STORM"
   - day: "MON"
-    conditions: "SUNNY"
-    high: "25"
-    low: "10"
-    snow_inches: 0
-    notable: "POWDER DAY"                   # fresh snow from storm!
+    conditions: "PARTLY CLOUDY"
+    high: "15"
+    low: "-5"                               # VERY COLD after storm!
+    snow_inches: 2
+    notable: "BITTER COLD"
 
-# Derived: What to show in bottom banner (based on decision logic in 1F)
-banner_text: "MAJOR STORM SAT • 13\" EXPECTED"  # or empty for decorative border
+# Derived: What to show in bottom banner
+# Since there's a big storm Sunday AND bitter cold Monday, combine them:
+banner_text: "BIG STORM SUN • 10\" SNOW • THEN BITTER COLD MON"
 
 # Mohawk Mountain
-trails_open: "25"
+trails_open: "16"           # Count from chrome-driver screenshot
 trails_total: "27"
 base_depth: "20"
-surface: "GROOMED"
-lifts_open: "6"
+surface: "VARIABLE"         # From "Secondary Surface" on snow report
+lifts_open: "4"             # Count from Lifts section
 
 # Sun/Moon
 sunrise: "7:10 AM"
@@ -208,9 +194,9 @@ moon_phase: "waning crescent"
 
 ### Base Scene (always the same)
 ```
-Illustration in woodcut/linocut style optimized for 4-gray e-ink display. Wide 16:9 landscape format. Use exactly 4 tones: white, light gray, dark gray, black.
+Black and white 1-bit line drawing illustration in woodcut/linocut etching style for e-ink display. Wide 16:9 landscape format. Use ONLY pure black and pure white - no grays, no gradients, no halftones.
 
-SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees covered in snow (use light gray for snow-covered areas, dark gray for tree shadows), ski lift chairs visible, and a skier carving down a groomed trail. Rocky outcrops and rolling hills of the Berkshires in background. Sky in pure white, distant mountains in light gray, foreground elements with dark gray shadows.
+SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees covered in snow (use black line work for tree details, white for snow), ski lift chairs visible, and a skier carving down a groomed trail. Rocky outcrops and rolling hills of the Berkshires in background. Sky in pure white, mountains rendered with black line hatching on white. All shading done with cross-hatching or stippling patterns, never solid gray.
 ```
 
 ### Left Side Signpost (varies based on alerts)
@@ -220,7 +206,8 @@ SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees cove
 LEFT SIDE - Rustic wooden signpost with multiple signs showing:
 - '{{DATE}}' (top sign, arrow style pointing right)
 - '{{TEMPERATURE}}°F {{CONDITIONS}}' (middle sign)
-- 'WIND CHILL {{WIND_CHILL}}°F' (lower sign)
+- 'HIGH {{HIGH}}°F / LOW {{LOW}}°F' (next sign)
+- 'WIND CHILL {{WIND_CHILL}}°F' (lower sign, only if wind chill differs from temp)
 - Warning triangle sign with '⚠ {{WEATHER_ADVISORY}}'
 ```
 
@@ -231,6 +218,8 @@ LEFT SIDE - Rustic wooden signpost with multiple signs showing:
 - '{{TEMPERATURE}}°F {{CONDITIONS}}' (middle sign)
 - 'HIGH {{HIGH}}°F / LOW {{LOW}}°F' (lower sign)
 ```
+
+> **Always include HIGH/LOW temperatures** - this is key information for skiers planning their day!
 
 ### Top Right Icons (always the same structure)
 ```
@@ -281,50 +270,52 @@ BOTTOM LEFT CORNER - Small text in a simple frame reading 'Updated {{TIMESTAMP}}
 
 ### Style Instructions (always the same)
 ```
-Style: Illustration optimized for 4-gray e-ink display. Use exactly 4 tones: pure white, light gray, dark gray, and pure black. No gradients or smooth transitions - use flat areas of each tone. Woodcut/linocut aesthetic with bold shapes. Dark gray for shadows and depth, light gray for mid-tones and snow texture. Pure black for outlines, text, and darkest elements. Pure white for sky and highlights. All text must be clearly legible in pure black on white or light gray backgrounds. Vintage ski poster aesthetic.
+Style: 1-bit black and white line drawing for e-ink display. Use ONLY pure black and pure white - absolutely no gray tones. Woodcut/linocut etching aesthetic with bold black lines on white background. All shading must be done with hatching, cross-hatching, or stippling patterns - never solid gray fills. Text must be crisp black on white backgrounds. High contrast vintage ski poster aesthetic. Think classic woodblock print or pen and ink illustration.
 ```
 
 ---
 
 ## Step 4: Complete Prompt Examples
 
-### Example A: With Cold Advisory + Storm Watch (current conditions)
+### Example A: Big Storm Coming This Weekend + Very Cold
 
 ```
-Illustration in woodcut/linocut style for 4-gray e-ink display. Wide 16:9 landscape format. Use exactly 4 tones: white, light gray, dark gray, black.
+Black and white 1-bit line drawing in woodcut/linocut etching style for e-ink display. Wide 16:9 landscape format. Use ONLY pure black and pure white - no grays.
 
-SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees covered in snow (light gray for snow, dark gray for shadows), ski lift chairs visible, and a skier carving down a groomed trail. Rocky outcrops and rolling hills of the Berkshires in background. White sky, light gray distant mountains, dark gray shadows.
+SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees covered in snow (black line hatching for tree details, white for snow), ski lift chairs visible, and a skier carving down a groomed trail. Rocky outcrops and rolling hills of the Berkshires in background. White sky, mountains with black cross-hatching for depth.
 
 LEFT SIDE - Rustic wooden signpost with multiple signs showing:
-- 'FRI 23 JAN' (top sign, arrow style pointing right)
+- 'THU 23 JAN' (top sign, arrow style pointing right)
 - '25°F FAIR' (middle sign)
+- 'HIGH 27°F / LOW 8°F' (next sign)
 - 'WIND CHILL 16°F' (lower sign)
-- Warning triangle sign with '⚠ COLD ADVISORY'
 
 TOP RIGHT - Three framed icons in decorative vintage borders:
 - Sunrise icon with '7:10 AM'
 - Moon phase icon showing waning crescent moon
-- Sunset icon with '4:58 PM'
+- Sunset icon with '5:01 PM'
 
 BOTTOM RIGHT - Wooden ski conditions board showing:
 - 'MOHAWK MTN' as header
-- '25/27 TRAILS'
+- '26/27 TRAILS'
 - '20" BASE'
-- 'GROOMED'
+- 'VARIABLE'
 
-BOTTOM CENTER - Banner ribbon with 'STORM WATCH SAT-SUN • 13" EXPECTED'
+BOTTOM CENTER - Large banner ribbon with 'BIG STORM SUN • 8-12" SNOW • THEN BITTER COLD'
 
 BOTTOM LEFT CORNER - Small text in a simple frame reading 'Updated 10:15 AM'
 
-Style: 4-gray e-ink optimized. Use exactly 4 flat tones: white, light gray, dark gray, black. No gradients. Woodcut/linocut aesthetic with bold shapes. Text in pure black on white/light gray. Vintage ski poster style.
+Style: 1-bit black and white line drawing. Use ONLY pure black and pure white - no gray tones. All shading with hatching/cross-hatching. Woodcut/linocut etching aesthetic. Crisp black text on white. Vintage ski poster style.
 ```
+
+> **Key point:** The banner prominently displays that a big storm is coming Sunday with 8-12" of snow, followed by bitter cold. This is the most important information for someone planning their weekend skiing!
 
 ### Example B: No Alerts (nice day)
 
 ```
-Illustration in woodcut/linocut style for 4-gray e-ink display. Wide 16:9 landscape format. Use exactly 4 tones: white, light gray, dark gray, black.
+Black and white 1-bit line drawing in woodcut/linocut etching style for e-ink display. Wide 16:9 landscape format. Use ONLY pure black and pure white - no grays.
 
-SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees covered in snow (light gray for snow, dark gray for shadows), ski lift chairs visible, and a skier carving down a groomed trail. Rocky outcrops and rolling hills of the Berkshires in background. White sky, light gray distant mountains, dark gray shadows.
+SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees covered in snow (black line work for details, white for snow), ski lift chairs visible, and a skier carving down a groomed trail. Rocky outcrops and rolling hills of the Berkshires in background. White sky, mountains with black hatching.
 
 LEFT SIDE - Rustic wooden signpost with multiple signs showing:
 - 'SAT 25 JAN' (top sign, arrow style pointing right)
@@ -346,19 +337,52 @@ BOTTOM CENTER - Decorative pine branch border with small snowflakes
 
 BOTTOM LEFT CORNER - Small text in a simple frame reading 'Updated 8:30 AM'
 
-Style: 4-gray e-ink optimized. Use exactly 4 flat tones: white, light gray, dark gray, black. No gradients. Woodcut/linocut aesthetic with bold shapes. Text in pure black on white/light gray. Vintage ski poster style.
+Style: 1-bit black and white line drawing. Use ONLY pure black and pure white - no gray tones. All shading with hatching/cross-hatching. Woodcut/linocut etching aesthetic. Crisp black text on white. Vintage ski poster style.
 ```
 
-### Example C: Winter Storm Warning (severe weather)
+### Example C: Weekend Storm Approaching (Friday view)
 
 ```
-Illustration in woodcut/linocut style for 4-gray e-ink display. Wide 16:9 landscape format. Use exactly 4 tones: white, light gray, dark gray, black.
+Black and white 1-bit line drawing in woodcut/linocut etching style for e-ink display. Wide 16:9 landscape format. Use ONLY pure black and pure white - no grays.
 
-SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees covered in snow (light gray for snow, dark gray for shadows), ski lift chairs visible, and a skier carving down a groomed trail. Rocky outcrops and rolling hills of the Berkshires in background. White sky with light gray snowflakes scattered across scene to suggest heavy snowfall, dark gray shadows.
+SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees covered in snow, ski lift chairs visible. Ominous clouds suggested by dense black hatching on the horizon. Rocky outcrops and rolling hills of the Berkshires in background.
+
+LEFT SIDE - Rustic wooden signpost with multiple signs showing:
+- 'FRI 24 JAN' (top sign, arrow style pointing right)
+- '30°F CLOUDY' (middle sign)
+- 'HIGH 32°F / LOW 20°F' (next sign)
+
+TOP RIGHT - Three framed icons in decorative vintage borders:
+- Sunrise icon with '7:09 AM'
+- Moon phase icon showing waning crescent moon
+- Sunset icon with '5:03 PM'
+
+BOTTOM RIGHT - Wooden ski conditions board showing:
+- 'MOHAWK MTN' as header
+- '26/27 TRAILS'
+- '22" BASE'
+- 'GROOMED'
+
+BOTTOM CENTER - Large prominent banner ribbon with '⚠ MAJOR STORM SUN-MON • 10-14" EXPECTED'
+
+BOTTOM LEFT CORNER - Small text in a simple frame reading 'Updated 7:30 AM'
+
+Style: 1-bit black and white line drawing. Use ONLY pure black and pure white - no gray tones. All shading with hatching/cross-hatching. Woodcut/linocut etching aesthetic. Crisp black text on white. Vintage ski poster style.
+```
+
+> **Key point:** Even though today (Friday) is nice, the banner warns about the major storm coming Sunday-Monday. Skiers need to know this to plan their weekend!
+
+### Example D: Active Winter Storm Warning
+
+```
+Black and white 1-bit line drawing in woodcut/linocut etching style for e-ink display. Wide 16:9 landscape format. Use ONLY pure black and pure white - no grays.
+
+SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees covered in snow, ski lift chairs visible, and a skier carving down a groomed trail. Rocky outcrops and rolling hills of the Berkshires in background. White sky with black stippled snowflakes scattered across scene to suggest heavy snowfall.
 
 LEFT SIDE - Rustic wooden signpost with multiple signs showing:
 - 'SUN 26 JAN' (top sign, arrow style pointing right)
 - '28°F SNOW' (middle sign)
+- 'HIGH 30°F / LOW 22°F' (next sign)
 - 'WIND CHILL 15°F' (lower sign)
 - Warning triangle sign with '⚠ WINTER STORM WARNING'
 
@@ -377,15 +401,15 @@ BOTTOM CENTER - Large banner ribbon with '⚠ BLIZZARD CONDITIONS • 18" FALLIN
 
 BOTTOM LEFT CORNER - Small text in a simple frame reading 'Updated 11:45 AM'
 
-Style: 4-gray e-ink optimized. Use exactly 4 flat tones: white, light gray, dark gray, black. No gradients. Woodcut/linocut aesthetic with bold shapes. Text in pure black on white/light gray. Vintage ski poster style.
+Style: 1-bit black and white line drawing. Use ONLY pure black and pure white - no gray tones. All shading with hatching/cross-hatching. Woodcut/linocut etching aesthetic. Crisp black text on white. Vintage ski poster style.
 ```
 
-### Example D: Powder Day (day after storm)
+### Example E: Powder Day (day after storm)
 
 ```
-Black and white pen and ink illustration in woodcut etching style for an e-ink display. Wide 16:9 landscape format.
+Black and white 1-bit line drawing in woodcut/linocut etching style for e-ink display. Wide 16:9 landscape format. Use ONLY pure black and pure white - no grays.
 
-SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees heavily laden with fresh snow (bright white snow, light gray tree shadows), ski lift chairs visible, and a skier spraying powder while carving down an ungroomed trail. Brilliant sunshine suggested by white radiating lines on light gray sky. Rocky outcrops (dark gray) and rolling hills of the Berkshires in background (light gray).
+SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees heavily laden with fresh snow (black line details, white snow), ski lift chairs visible, and a skier spraying powder while carving down an ungroomed trail. Brilliant sunshine suggested by white radiating lines from sun. Rocky outcrops and rolling hills of the Berkshires in background with black hatching.
 
 LEFT SIDE - Rustic wooden signpost with multiple signs showing:
 - 'MON 27 JAN' (top sign, arrow style pointing right)
@@ -407,15 +431,15 @@ BOTTOM CENTER - Celebratory banner ribbon with '❄ POWDER DAY • 15" FRESH ❄
 
 BOTTOM LEFT CORNER - Small text in a simple frame reading 'Updated 7:30 AM'
 
-Style: 4-gray e-ink optimized. Use exactly 4 flat tones: white, light gray, dark gray, black. No gradients. Woodcut/linocut aesthetic with bold shapes. Text in pure black on white/light gray. Vintage ski poster style.
+Style: 1-bit black and white line drawing. Use ONLY pure black and pure white - no gray tones. All shading with hatching/cross-hatching. Woodcut/linocut etching aesthetic. Crisp black text on white. Vintage ski poster style.
 ```
 
-### Example E: Rain Warning (important for skiers!)
+### Example F: Rain Warning (important for skiers!)
 
 ```
-Black and white pen and ink illustration in woodcut etching style for an e-ink display. Wide 16:9 landscape format.
+Black and white 1-bit line drawing in woodcut/linocut etching style for e-ink display. Wide 16:9 landscape format. Use ONLY pure black and pure white - no grays.
 
-SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees covered in snow (light gray snow, dark gray shadows), ski lift chairs visible. Overcast sky in light gray (darker than usual to suggest clouds). Rocky outcrops (dark gray) and rolling hills of the Berkshires in background. Muted, flat lighting with less contrast to suggest dreary weather.
+SCENE: Snowy New England ski mountain landscape with ski slopes, pine trees covered in snow, ski lift chairs visible. Overcast sky suggested by dense black hatching across top. Rocky outcrops and rolling hills of the Berkshires in background with cross-hatching.
 
 LEFT SIDE - Rustic wooden signpost with multiple signs showing:
 - 'THU 30 JAN' (top sign, arrow style pointing right)
@@ -437,7 +461,7 @@ BOTTOM CENTER - Warning banner ribbon with '⚠ RAIN TONIGHT • ICY CONDITIONS 
 
 BOTTOM LEFT CORNER - Small text in a simple frame reading 'Updated 2:15 PM'
 
-Style: 4-gray e-ink optimized. Use exactly 4 flat tones: white, light gray, dark gray, black. No gradients. Woodcut/linocut aesthetic with bold shapes. Text in pure black on white/light gray. Vintage ski poster style.
+Style: 1-bit black and white line drawing. Use ONLY pure black and pure white - no gray tones. All shading with hatching/cross-hatching. Woodcut/linocut etching aesthetic. Crisp black text on white. Vintage ski poster style.
 ```
 
 ---
@@ -457,17 +481,18 @@ npx @the-focus-ai/nano-banana "YOUR_COMPLETE_PROMPT_HERE" \
   --output output/$(date +%Y-%m)/$(date +%Y-%m-%d-%H-%M)-full.png
 ```
 
-## Step 6: Convert to 4-Gray Palette for TRMNL
+## Step 6: Convert to 1-Bit Black & White for TRMNL
 
 ```bash
 magick output/$(date +%Y-%m)/$(date +%Y-%m-%d-%H-%M)-full.png \
   -colorspace Gray \
-  -colors 4 \
-  -depth 8 \
+  -threshold 50% \
+  -colors 2 \
+  -depth 1 \
   PNG8:output/$(date +%Y-%m)/$(date +%Y-%m-%d-%H-%M).png
 ```
 
-**Note:** Since we generated at exact 800x480, no resizing is needed. This just converts to the 4-color grayscale palette optimized for TRMNL's e-ink display.
+**Note:** Since we generated at exact 800x480, no resizing is needed. The `-threshold 50%` converts all pixels to pure black or pure white (1-bit) for crisp e-ink display. Adjust threshold percentage if needed (higher = more white, lower = more black).
 
 ## Step 7: Update README (ALWAYS DO THIS!)
 
@@ -497,7 +522,7 @@ After generating a new image, **always update README.md** to show the latest ima
 output/
 ├── 2026-01/
 │   ├── 2026-01-23-09-52-full.png    # Original from nano-banana
-│   ├── 2026-01-23-09-52.png         # TRMNL-ready (800x480, 1-bit)
+│   ├── 2026-01-23-09-52.png         # TRMNL-ready (800x480, 1-bit B&W)
 │   ├── 2026-01-23-14-30-full.png
 │   ├── 2026-01-23-14-30.png
 │   └── ...
@@ -510,79 +535,26 @@ output/
 
 ## Data Sources Quick Reference
 
-| Data | URL | Method | Status |
-|------|-----|--------|--------|
-| Weather + Alerts | https://forecast.weather.gov/MapClick.php?lat=41.8456&lon=-73.3284 | WebFetch | ✅ Works |
-| Ski Conditions (Primary) | https://www.mohawkmtn.com/snow-report/ | chrome-driver | ✅ Works (kill Chrome first) |
-| Ski Conditions (Backup) | https://www.onthesnow.com/connecticut/mohawk-mountain/skireport | WebFetch | ✅ Works |
-| Snow Forecast | https://www.snow-forecast.com/resorts/Mohawk-Mountain/snow-report | WebFetch | ✅ Works |
-| Trail Map | https://www.onthesnow.com/connecticut/mohawk-mountain/trailmap | WebFetch | ✅ Works |
+| Data | Subagent Prompt | Method |
+|------|-----------------|--------|
+| Weather + Alerts + Forecast | `prompts/fetch-weather.md` | WebFetch |
+| Mohawk Conditions | `prompts/fetch-mohawk.md` | chrome-driver |
+
+**Backup sources (if primary fails):**
+- Ski conditions: https://www.onthesnow.com/connecticut/mohawk-mountain/skireport (WebFetch)
+- Snow forecast: https://www.snow-forecast.com/resorts/Mohawk-Mountain/snow-report (WebFetch)
 
 ---
 
-## Data Fetching Notes
+## Resort Facts (static - no need to fetch)
 
-### What Works
-
-**Mohawk Official Site (RECOMMENDED for ski conditions - use chrome-driver)**
-- URL: `https://www.mohawkmtn.com/snow-report/`
-- Method: chrome-driver (NOT WebFetch - page loads via JavaScript)
-- Returns: trails open, lifts open, base depth, surface conditions, hours, high/low temps
-- **Important:** Kill Chrome before fetching to avoid WebSocket errors:
-  ```bash
-  pkill -f "Google Chrome" || true; sleep 2
-  /Users/wschenk/.claude/plugins/cache/focus-marketplace/chrome-driver/0.1.0/bin/extract "https://www.mohawkmtn.com/snow-report/" --format=text
-  ```
-- Or take a screenshot: `/Users/wschenk/.claude/plugins/cache/focus-marketplace/chrome-driver/0.1.0/bin/screenshot "https://www.mohawkmtn.com/snow-report/" /tmp/mohawk.png --full-page`
-
-**NWS Weather (RECOMMENDED for weather + alerts)**
-- URL: `https://forecast.weather.gov/MapClick.php?lat=41.8456&lon=-73.3284`
-- Returns: current temp, conditions, wind, alerts (winter storm watch/warning, etc.)
-- WebFetch prompt: `Extract current temperature, conditions, wind, any active weather alerts or warnings, and the forecast for the next 2 days including high and low temperatures.`
-
-**OnTheSnow (BACKUP for ski conditions)**
-- URL: `https://www.onthesnow.com/connecticut/mohawk-mountain/skireport`
-- Returns: trails open (X of 27), lifts open (X of 8), base depth, hours, forecast
-- WebFetch prompt: `Extract all current conditions: trails open, lifts open, base depth, new snow, snowmaking status, hours, and any alerts.`
-
-**Snow-Forecast.com (good for predictions)**
-- URL: `https://www.snow-forecast.com/resorts/Mohawk-Mountain/snow-report`
-- Returns: snow forecasts, expected accumulation
-- WebFetch prompt: `Extract current snow depth, weather conditions, and snow forecast for the next few days including expected accumulation.`
-
-### Sample Data (January 2026)
-
-From mohawkmtn.com on 2026-01-23 (via chrome-driver):
-```yaml
-status: "Open"
-last_updated: "Friday, January 23, 2026 at 7:31 AM"
-todays_high: 27  # from "Today's Inside Scoop"
-trails_open: 16
-trails_total: 27
-lifts_open: 4
-lifts_total: 8
-surface: "Variable Conditions (machine groomed)"
-hours: "10:00am - 8:30pm"
-night_skiing: "Available on multiple trails"
-tubing: "Open 10AM to post-sunset"
-```
-
-From NWS forecast.weather.gov:
-```yaml
-current_temp: 25
-conditions: "Fair"
-wind_chill: 16
-wind: "W 10-15 mph"
-today_high: 27
-tonight_low: -2
-```
-
-### Resort Facts (static)
-- Summit elevation: 1,600 ft
-- Vertical drop: 650 ft
-- Skiable terrain: 107 acres
-- Total trails: 27 (use 27 as trails_total)
-- Total lifts: 8 (use 8 as lifts_total)
-- Night skiing: 12 trails
-- Snowmaking: 95% terrain coverage
-- Founded: 1947 (CT's oldest ski area)
+| Fact | Value |
+|------|-------|
+| Total trails | 27 |
+| Total lifts | 8 |
+| Summit elevation | 1,600 ft |
+| Vertical drop | 650 ft |
+| Skiable terrain | 107 acres |
+| Night skiing trails | 12 |
+| Snowmaking coverage | 95% |
+| Founded | 1947 (CT's oldest ski area) |
