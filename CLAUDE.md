@@ -15,12 +15,13 @@ Or use this shortcut:
 export GEMINI_API_KEY=$(op read "op://Development/Google AI Studio Key/notesPlain")
 ```
 
-## TRMNL Webhook
+## TRMNL Webhooks
 
-Get TRMNL Webhook URL from 1Password:
+Get TRMNL Webhook URLs from 1Password:
 
 ```bash
 export TRMNL_WEBHOOK_URL=$(op read "op://Personal/Market TRMNL Webhook/notesPlain")
+export TRMNL_HOME_WEBHOOK_URL=$(op read "op://Personal/Home TRMNL Webhook/notesPlain")
 ```
 
 ## TRMNL Image Limits
