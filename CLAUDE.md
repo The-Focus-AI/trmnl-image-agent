@@ -4,25 +4,13 @@ Project for generating custom images for TRMNL e-ink displays.
 
 ## Environment Variables
 
-Get Gemini API key from 1Password:
+For each variable, first check if it's already set in the environment. If not set, fetch from 1Password using the `op read` command.
 
-```bash
-export GEMINI_API_KEY=$(op item get "gm5b2ksnsffccmjslpdtj2sw5y" --format json | jq -r '.fields[] | select(.label == "notesPlain") | .value')
-```
-
-Or use this shortcut:
-```bash
-export GEMINI_API_KEY=$(op read "op://Development/Google AI Studio Key/notesPlain")
-```
-
-## TRMNL Webhooks
-
-Get TRMNL Webhook URLs from 1Password:
-
-```bash
-export TRMNL_WEBHOOK_URL=$(op read "op://Personal/Market TRMNL Webhook/notesPlain")
-export TRMNL_HOME_WEBHOOK_URL=$(op read "op://Personal/Home TRMNL Webhook/notesPlain")
-```
+| Variable | 1Password Path |
+|----------|----------------|
+| GEMINI_API_KEY | `op://Development/Google AI Studio Key/notesPlain` |
+| TRMNL_WEBHOOK_URL | `op://Personal/Market TRMNL Webhook/notesPlain` |
+| TRMNL_HOME_WEBHOOK_URL | `op://Personal/Home TRMNL Webhook/notesPlain` |
 
 ## TRMNL Image Limits
 
