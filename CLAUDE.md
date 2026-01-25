@@ -15,3 +15,18 @@ For each variable, first check if it's already set in the environment. If not se
 ## TRMNL Image Limits
 
 800x480 pixels, PNG/JPEG/BMP, max 5MB, 12 uploads/hour
+
+## Pushing Images to TRMNL
+
+When posting images to the TRMNL webhook URLs, always include cache-busting headers to ensure the new image is displayed:
+
+```bash
+curl -X POST \
+  -H "Content-Type: image/png" \
+  -H "Cache-Control: no-cache" \
+  -H "X-Timestamp: $(date +%s)" \
+  --data-binary @path/to/image.png \
+  "$TRMNL_WEBHOOK_URL"
+```
+
+Without these headers, TRMNL may serve a cached version of the image even after a successful upload.
