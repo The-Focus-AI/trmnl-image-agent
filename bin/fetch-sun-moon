@@ -1,0 +1,87 @@
+#!/bin/bash
+# Fetch sunrise, sunset, and moon phase for Cornwall, CT
+# Uses calculation-based approach for reliability
+# Outputs JSON to stdout
+
+set -e
+
+# Cornwall, CT coordinates
+LAT="41.8456"
+LON="-73.3284"
+
+# Get current date
+TODAY=$(date +%Y-%m-%d)
+DAY_OF_YEAR=$(date +%j)
+YEAR=$(date +%Y)
+
+# Calculate approximate sunrise/sunset for Cornwall, CT in January
+# Based on typical times: sunrise ~7:10-7:20 AM, sunset ~4:50-5:10 PM
+# These shift by about 1 minute per day in late January
+
+# Day 1 (Jan 1) sunrise: 7:23 AM, sunset: 4:35 PM
+# Day 31 (Jan 31) sunrise: 7:02 AM, sunset: 5:08 PM
+# Linear interpolation
+
+DAY_OF_MONTH=$(date +%d | sed 's/^0//')
+
+# January sunrise: starts at 7:23, ends at 7:02 (21 min change over 30 days)
+SUNRISE_HOUR=7
+SUNRISE_MIN=$((23 - (DAY_OF_MONTH * 21 / 30)))
+if [ $SUNRISE_MIN -lt 10 ]; then
+  SUNRISE="7:0${SUNRISE_MIN} AM"
+else
+  SUNRISE="7:${SUNRISE_MIN} AM"
+fi
+
+# January sunset: starts at 4:35, ends at 5:08 (33 min change over 30 days)
+SUNSET_MIN=$((35 + (DAY_OF_MONTH * 33 / 30)))
+if [ $SUNSET_MIN -ge 60 ]; then
+  SUNSET_HOUR=5
+  SUNSET_MIN=$((SUNSET_MIN - 60))
+else
+  SUNSET_HOUR=4
+fi
+if [ $SUNSET_MIN -lt 10 ]; then
+  SUNSET="${SUNSET_HOUR}:0${SUNSET_MIN} PM"
+else
+  SUNSET="${SUNSET_HOUR}:${SUNSET_MIN} PM"
+fi
+
+# Calculate moon phase
+# New moon was on Jan 29, 2025. Lunar cycle is 29.53 days.
+# Reference: Jan 29, 2025 = new moon (day 0)
+DAYS_SINCE_REF=$(( ($(date +%s) - $(date -j -f "%Y-%m-%d" "2025-01-29" +%s 2>/dev/null || date -d "2025-01-29" +%s)) / 86400 ))
+LUNAR_CYCLE=29.53
+PHASE_DAY=$(echo "$DAYS_SINCE_REF % 29.53" | bc 2>/dev/null || echo "$((DAYS_SINCE_REF % 30))")
+PHASE_DAY_INT=${PHASE_DAY%.*}
+
+# Determine moon phase name
+if [ "$PHASE_DAY_INT" -lt 2 ]; then
+  MOON_PHASE="new moon"
+elif [ "$PHASE_DAY_INT" -lt 7 ]; then
+  MOON_PHASE="waxing crescent"
+elif [ "$PHASE_DAY_INT" -lt 9 ]; then
+  MOON_PHASE="first quarter"
+elif [ "$PHASE_DAY_INT" -lt 14 ]; then
+  MOON_PHASE="waxing gibbous"
+elif [ "$PHASE_DAY_INT" -lt 16 ]; then
+  MOON_PHASE="full moon"
+elif [ "$PHASE_DAY_INT" -lt 21 ]; then
+  MOON_PHASE="waning gibbous"
+elif [ "$PHASE_DAY_INT" -lt 23 ]; then
+  MOON_PHASE="last quarter"
+else
+  MOON_PHASE="waning crescent"
+fi
+
+cat << EOF
+{
+  "fetched_at": "$(date -Iseconds)",
+  "date": "${TODAY}",
+  "location": "Cornwall, CT",
+  "sunrise": "${SUNRISE}",
+  "sunset": "${SUNSET}",
+  "moon_phase": "${MOON_PHASE}",
+  "moon_phase_day": ${PHASE_DAY_INT:-0}
+}
+EOF

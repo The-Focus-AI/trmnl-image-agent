@@ -1,0 +1,77 @@
+#!/bin/bash
+# Push image to TRMNL displays
+# Pushes to both Market and Home webhooks
+
+set -e
+
+IMAGE_FILE="$1"
+
+if [ -z "$IMAGE_FILE" ] || [ ! -f "$IMAGE_FILE" ]; then
+  echo "Usage: push-image <image.png>" >&2
+  echo "Error: Image file not found: $IMAGE_FILE" >&2
+  exit 1
+fi
+
+# Verify file size
+SIZE=$(stat -f%z "$IMAGE_FILE" 2>/dev/null || stat -c%s "$IMAGE_FILE")
+SIZE_KB=$((SIZE / 1024))
+
+if [ "$SIZE_KB" -gt 90 ]; then
+  echo "Error: Image is ${SIZE_KB}KB, exceeds TRMNL 90KB limit" >&2
+  exit 1
+fi
+
+echo "Pushing image to TRMNL displays..." >&2
+echo "  Image: $IMAGE_FILE (${SIZE_KB}KB)" >&2
+
+# Get webhook URLs from environment or 1Password
+if [ -z "$TRMNL_WEBHOOK_URL" ]; then
+  if command -v op &> /dev/null; then
+    export TRMNL_WEBHOOK_URL=$(op read "op://Personal/Market TRMNL Webhook/notesPlain")
+  else
+    echo "Error: TRMNL_WEBHOOK_URL not set" >&2
+    exit 1
+  fi
+fi
+
+if [ -z "$TRMNL_HOME_WEBHOOK_URL" ]; then
+  if command -v op &> /dev/null; then
+    export TRMNL_HOME_WEBHOOK_URL=$(op read "op://Personal/Home TRMNL Webhook/notesPlain")
+  else
+    echo "Warning: TRMNL_HOME_WEBHOOK_URL not set, skipping home display" >&2
+  fi
+fi
+
+# Push to Market TRMNL
+echo "  Pushing to Market TRMNL..." >&2
+RESPONSE=$(curl -s -X POST \
+  -H "Content-Type: image/png" \
+  -H "Cache-Control: no-cache" \
+  -H "X-Timestamp: $(date +%s)" \
+  --data-binary "@$IMAGE_FILE" \
+  "$TRMNL_WEBHOOK_URL")
+
+if echo "$RESPONSE" | grep -q "successfully"; then
+  echo "  ✓ Market TRMNL: Success" >&2
+else
+  echo "  ✗ Market TRMNL: $RESPONSE" >&2
+fi
+
+# Push to Home TRMNL (if URL is set)
+if [ -n "$TRMNL_HOME_WEBHOOK_URL" ]; then
+  echo "  Pushing to Home TRMNL..." >&2
+  RESPONSE=$(curl -s -X POST \
+    -H "Content-Type: image/png" \
+    -H "Cache-Control: no-cache" \
+    -H "X-Timestamp: $(date +%s)" \
+    --data-binary "@$IMAGE_FILE" \
+    "$TRMNL_HOME_WEBHOOK_URL")
+
+  if echo "$RESPONSE" | grep -q "successfully"; then
+    echo "  ✓ Home TRMNL: Success" >&2
+  else
+    echo "  ✗ Home TRMNL: $RESPONSE" >&2
+  fi
+fi
+
+echo "Done!" >&2

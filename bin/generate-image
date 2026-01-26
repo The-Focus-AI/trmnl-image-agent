@@ -1,0 +1,34 @@
+#!/bin/bash
+# Generate TRMNL image using nano-banana
+# Uses prompt from /tmp/trmnl-prompt.txt
+# Outputs to output/YYYY-MM/YYYY-MM-DD-HH-MM-full.png
+
+set -e
+
+PROMPT_FILE="${1:-/tmp/trmnl-prompt.txt}"
+OUTPUT_DIR="output/$(date +%Y-%m)"
+OUTPUT_FILE="$OUTPUT_DIR/$(date +%Y-%m-%d-%H-%M)-full.png"
+
+if [ ! -f "$PROMPT_FILE" ]; then
+  echo "Error: Prompt file not found: $PROMPT_FILE" >&2
+  echo "Run build-prompt first" >&2
+  exit 1
+fi
+
+# Ensure output directory exists
+mkdir -p "$OUTPUT_DIR"
+
+# Check for GEMINI_API_KEY
+if [ -z "$GEMINI_API_KEY" ]; then
+  if command -v op &> /dev/null; then
+    export GEMINI_API_KEY=$(op read "op://Development/Google AI Studio Key/notesPlain")
+  else
+    echo "Error: GEMINI_API_KEY not set and 1Password CLI not available" >&2
+    exit 1
+  fi
+fi
+
+echo "Generating image with nano-banana..." >&2
+npx @the-focus-ai/nano-banana --prompt-file "$PROMPT_FILE" --output "$OUTPUT_FILE"
+
+echo "$OUTPUT_FILE"

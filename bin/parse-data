@@ -1,0 +1,136 @@
+#!/bin/bash
+# Parse raw weather and Mohawk data using Claude Haiku
+# Reads from /tmp/trmnl-data/
+# Outputs JSON to /tmp/trmnl-data/parsed.json
+
+set -e
+
+DATA_DIR="/tmp/trmnl-data"
+OUTPUT_FILE="$DATA_DIR/parsed.json"
+
+# Check for required files
+if [ ! -f "$DATA_DIR/weather.html" ]; then
+  echo "Error: Missing $DATA_DIR/weather.html" >&2
+  exit 1
+fi
+
+if [ ! -f "$DATA_DIR/mohawk.txt" ]; then
+  echo "Error: Missing $DATA_DIR/mohawk.txt" >&2
+  exit 1
+fi
+
+# Get current date/time
+CURRENT_DATE=$(date "+%a %d %b" | tr '[:lower:]' '[:upper:]')
+CURRENT_TIME=$(date "+%-I:%M %p")
+
+# Read sun/moon data (already JSON)
+SUN_MOON=$(cat "$DATA_DIR/sun-moon.json" 2>/dev/null || echo '{}')
+
+# Create the prompt for Haiku
+PROMPT="Parse the following weather and ski resort data and return ONLY valid JSON (no markdown, no code blocks, no explanation).
+
+CURRENT DATE/TIME: $CURRENT_DATE at $CURRENT_TIME
+
+SUN/MOON DATA (already parsed):
+$SUN_MOON
+
+---
+WEATHER DATA (from NWS):
+$(head -500 "$DATA_DIR/weather.html" | grep -v '<script' | grep -v '<style')
+
+---
+MOHAWK MOUNTAIN DATA:
+$(cat "$DATA_DIR/mohawk.txt")
+
+---
+
+Extract and return this exact JSON structure (NO markdown code blocks, just raw JSON):
+{
+  \"date\": \"$CURRENT_DATE\",
+  \"timestamp\": \"$CURRENT_TIME\",
+  \"weather\": {
+    \"temperature\": <current temp as number>,
+    \"conditions\": \"<current conditions like FAIR, SNOW, CLOUDY>\",
+    \"wind\": \"<wind description>\",
+    \"wind_chill\": <wind chill as number or null>,
+    \"high\": <today's high as number>,
+    \"low\": <tonight's low as number>
+  },
+  \"alerts\": {
+    \"weather_alert\": \"<NWS alert like WINTER STORM WARNING or null>\",
+    \"mountain_alert\": \"<mountain operational alert or null>\"
+  },
+  \"mohawk\": {
+    \"trails_open\": <number>,
+    \"trails_total\": 27,
+    \"lifts_open\": <number>,
+    \"base_depth\": <number or 30>,
+    \"surface\": \"<POWDER, VARIABLE, GROOMED, etc>\",
+    \"fresh_snow\": <inches of fresh snow as number or null>,
+    \"tubing_closed\": <true or false>,
+    \"night_skiing\": <true or false>
+  },
+  \"sun_moon\": {
+    \"sunrise\": \"<time like 7:15 AM>\",
+    \"sunset\": \"<time like 5:05 PM>\",
+    \"moon_phase\": \"<phase name>\"
+  },
+  \"banner\": {
+    \"type\": \"<powder_day|storm_warning|cold_advisory|mountain_alert|normal>\",
+    \"text\": \"<banner text to display or null for decorative border>\"
+  }
+}
+
+IMPORTANT RULES:
+1. If fresh snow >= 6 inches, set banner type to \"powder_day\" with text like \"❄ POWDER DAY • 20\\\" FRESH ❄\"
+2. If there's a winter storm warning, set banner type to \"storm_warning\"
+3. Count trails by looking for 'Trail Open' markers
+4. Look for phrases like '20\" of fresh snow' or 'brought about 20\"'
+5. Return ONLY the JSON object, no markdown code blocks, no backticks"
+
+echo "Parsing data with Claude Haiku..." >&2
+
+# Call Claude with haiku model and text output format
+RESULT=$(echo "$PROMPT" | claude --model haiku -p 2>/dev/null)
+
+# Extract JSON from the result - handle markdown code blocks
+CLEAN_RESULT=$(echo "$RESULT" | sed 's/^```json//' | sed 's/^```//' | sed 's/```$//')
+
+# Find the JSON object
+JSON_RESULT=$(echo "$CLEAN_RESULT" | grep -o '{[^}]*"date"[^}]*}' | head -1)
+
+# If that didn't work, try to extract everything between first { and last }
+if [ -z "$JSON_RESULT" ] || ! echo "$JSON_RESULT" | jq . > /dev/null 2>&1; then
+  # More aggressive extraction - get content between first { and matching }
+  JSON_RESULT=$(echo "$CLEAN_RESULT" | awk '/{/{p=1} p{print} /}/{p=0}' | tr '\n' ' ')
+fi
+
+# Write to output file
+echo "$JSON_RESULT" > "$OUTPUT_FILE"
+
+# Validate JSON
+if jq . "$OUTPUT_FILE" > /dev/null 2>&1; then
+  echo "Parsed data written to $OUTPUT_FILE" >&2
+else
+  echo "Warning: JSON validation failed, attempting to fix..." >&2
+  # Try to extract just the JSON part more aggressively
+  echo "$CLEAN_RESULT" | python3 -c "
+import sys
+import json
+import re
+
+text = sys.stdin.read()
+# Find JSON-like content
+match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', text, re.DOTALL)
+if match:
+    try:
+        obj = json.loads(match.group())
+        print(json.dumps(obj, indent=2))
+    except:
+        print(text)
+else:
+    print(text)
+" > "$OUTPUT_FILE" 2>/dev/null || echo "$CLEAN_RESULT" > "$OUTPUT_FILE"
+fi
+
+echo "$OUTPUT_FILE"

@@ -1,0 +1,15 @@
+#!/bin/bash
+# Fetch raw weather HTML from NWS
+# Outputs to /tmp/trmnl-data/weather.html
+
+set -e
+
+OUTPUT_DIR="/tmp/trmnl-data"
+OUTPUT_FILE="$OUTPUT_DIR/weather.html"
+NWS_URL="https://forecast.weather.gov/MapClick.php?lat=41.8456&lon=-73.3284"
+
+mkdir -p "$OUTPUT_DIR"
+
+curl -sL "$NWS_URL" > "$OUTPUT_FILE"
+
+echo "$OUTPUT_FILE"

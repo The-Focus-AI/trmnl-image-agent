@@ -1,0 +1,115 @@
+#!/bin/bash
+# Build TRMNL image prompt from parsed JSON data
+# Reads from /tmp/trmnl-data/parsed.json
+# Outputs prompt to /tmp/trmnl-prompt.txt
+
+set -e
+
+DATA_DIR="/tmp/trmnl-data"
+INPUT_FILE="$DATA_DIR/parsed.json"
+OUTPUT_FILE="/tmp/trmnl-prompt.txt"
+
+if [ ! -f "$INPUT_FILE" ]; then
+  echo "Error: Missing $INPUT_FILE - run parse-data first" >&2
+  exit 1
+fi
+
+if ! command -v jq &> /dev/null; then
+  echo "Error: jq is required" >&2
+  exit 1
+fi
+
+# Extract all values from parsed JSON
+DATE=$(jq -r '.date // "MON 26 JAN"' "$INPUT_FILE")
+TIMESTAMP=$(jq -r '.timestamp // "12:00 PM"' "$INPUT_FILE")
+
+TEMP=$(jq -r '.weather.temperature // 30' "$INPUT_FILE")
+CONDITIONS=$(jq -r '.weather.conditions // "FAIR"' "$INPUT_FILE")
+WIND_CHILL=$(jq -r '.weather.wind_chill // empty' "$INPUT_FILE")
+HIGH=$(jq -r '.weather.high // 32' "$INPUT_FILE")
+LOW=$(jq -r '.weather.low // 20' "$INPUT_FILE")
+
+WEATHER_ALERT=$(jq -r '.alerts.weather_alert // empty' "$INPUT_FILE")
+MOUNTAIN_ALERT=$(jq -r '.alerts.mountain_alert // empty' "$INPUT_FILE")
+
+TRAILS_OPEN=$(jq -r '.mohawk.trails_open // 27' "$INPUT_FILE")
+TRAILS_TOTAL=$(jq -r '.mohawk.trails_total // 27' "$INPUT_FILE")
+LIFTS_OPEN=$(jq -r '.mohawk.lifts_open // 6' "$INPUT_FILE")
+BASE_DEPTH=$(jq -r '.mohawk.base_depth // 30' "$INPUT_FILE")
+SURFACE=$(jq -r '.mohawk.surface // "VARIABLE"' "$INPUT_FILE")
+FRESH_SNOW=$(jq -r '.mohawk.fresh_snow // empty' "$INPUT_FILE")
+
+SUNRISE=$(jq -r '.sun_moon.sunrise // "7:15 AM"' "$INPUT_FILE")
+SUNSET=$(jq -r '.sun_moon.sunset // "5:00 PM"' "$INPUT_FILE")
+MOON_PHASE=$(jq -r '.sun_moon.moon_phase // "first quarter"' "$INPUT_FILE")
+
+BANNER_TYPE=$(jq -r '.banner.type // "normal"' "$INPUT_FILE")
+BANNER_TEXT=$(jq -r '.banner.text // empty' "$INPUT_FILE")
+
+# Build scene modifier based on conditions
+SCENE_MODIFIER="pine trees covered in snow (black line hatching for tree details, white for snow), ski lift chairs visible, and a skier carving down a groomed trail"
+
+if [ "$BANNER_TYPE" = "powder_day" ]; then
+  SCENE_MODIFIER="pine trees heavily laden with fresh snow, skier spraying powder while carving down a trail leaving a white powder spray behind them"
+  SURFACE="POWDER"
+elif [ "$BANNER_TYPE" = "storm_warning" ]; then
+  SCENE_MODIFIER="pine trees covered in snow, ski lift chairs visible, ominous clouds suggested by dense hatching on the horizon indicating incoming storm"
+fi
+
+# Build wind chill sign if significant
+WIND_CHILL_SIGN=""
+if [ -n "$WIND_CHILL" ] && [ "$WIND_CHILL" != "null" ]; then
+  DIFF=$((TEMP - WIND_CHILL))
+  if [ "$DIFF" -ge 5 ] 2>/dev/null; then
+    WIND_CHILL_SIGN="- 'WIND CHILL ${WIND_CHILL}°F' (lower sign)"
+  fi
+fi
+
+# Build weather alert sign
+ALERT_SIGN=""
+if [ -n "$WEATHER_ALERT" ] && [ "$WEATHER_ALERT" != "null" ]; then
+  ALERT_SIGN="- Warning triangle sign with '⚠ ${WEATHER_ALERT}'"
+fi
+
+# Build bottom banner
+if [ -n "$BANNER_TEXT" ] && [ "$BANNER_TEXT" != "null" ]; then
+  BOTTOM_BANNER="BOTTOM CENTER - Large prominent banner ribbon with '${BANNER_TEXT}'"
+else
+  BOTTOM_BANNER="BOTTOM CENTER - Decorative pine branch border with small snowflakes"
+fi
+
+# Generate the prompt
+cat > "$OUTPUT_FILE" << EOF
+Black and white 1-bit line drawing in woodcut/linocut etching style for e-ink display. Wide 16:9 landscape format. Use ONLY pure black and pure white - no grays.
+
+SCENE: Snowy New England ski mountain landscape with ski slopes, ${SCENE_MODIFIER}. Rocky outcrops and rolling hills of the Berkshires in background with black hatching.
+
+LEFT SIDE - Rustic wooden signpost with multiple signs showing:
+- '${DATE}' (top sign, arrow style pointing right)
+- '${TEMP}°F ${CONDITIONS}' (middle sign)
+- 'HIGH ${HIGH}°F / LOW ${LOW}°F' (next sign)
+${WIND_CHILL_SIGN}
+${ALERT_SIGN}
+
+TOP RIGHT - Three framed icons in decorative vintage borders:
+- Sunrise icon with '${SUNRISE}'
+- Moon phase icon showing ${MOON_PHASE} moon
+- Sunset icon with '${SUNSET}'
+
+BOTTOM RIGHT - Wooden ski conditions board showing:
+- 'MOHAWK MTN' as header
+- '${TRAILS_OPEN}/${TRAILS_TOTAL} TRAILS'
+- '${BASE_DEPTH}" BASE'
+- '${SURFACE}'
+
+${BOTTOM_BANNER}
+
+BOTTOM LEFT CORNER - Small text in a simple frame reading 'Updated ${TIMESTAMP}'
+
+Style: 1-bit black and white line drawing. Use ONLY pure black and pure white - no gray tones. All shading with hatching/cross-hatching. Woodcut/linocut etching aesthetic. Crisp black text on white. Vintage ski poster style.
+EOF
+
+echo "Prompt written to $OUTPUT_FILE" >&2
+cat "$OUTPUT_FILE" >&2
+echo ""
+echo "$OUTPUT_FILE"

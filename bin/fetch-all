@@ -1,0 +1,35 @@
+#!/bin/bash
+# Fetch all raw data sources in parallel
+# Outputs file paths to stdout
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+OUTPUT_DIR="/tmp/trmnl-data"
+
+mkdir -p "$OUTPUT_DIR"
+
+echo "Fetching raw data in parallel..." >&2
+
+# Run fetchers in parallel
+"$SCRIPT_DIR/fetch-weather-raw" > /dev/null &
+PID_WEATHER=$!
+
+"$SCRIPT_DIR/fetch-mohawk-raw" > /dev/null &
+PID_MOHAWK=$!
+
+# Sun/moon is calculated, not fetched - keep the simple script
+"$SCRIPT_DIR/fetch-sun-moon" > "$OUTPUT_DIR/sun-moon.json" &
+PID_SUN=$!
+
+# Wait for all to complete
+wait $PID_WEATHER
+wait $PID_MOHAWK
+wait $PID_SUN
+
+echo "Raw data fetched:" >&2
+echo "  - $OUTPUT_DIR/weather.html" >&2
+echo "  - $OUTPUT_DIR/mohawk.txt" >&2
+echo "  - $OUTPUT_DIR/sun-moon.json" >&2
+
+echo "$OUTPUT_DIR"

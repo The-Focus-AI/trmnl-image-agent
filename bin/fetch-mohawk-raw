@@ -1,0 +1,21 @@
+#!/bin/bash
+# Fetch raw Mohawk Mountain page content
+# Outputs to /tmp/trmnl-data/mohawk.txt
+
+set -e
+
+OUTPUT_DIR="/tmp/trmnl-data"
+OUTPUT_FILE="$OUTPUT_DIR/mohawk.txt"
+CHROME_EXTRACT="/Users/wschenk/.claude/plugins/cache/focus-marketplace/chrome-driver/0.1.0/bin/extract"
+MOHAWK_URL="https://www.mohawkmtn.com/snow-report/"
+
+mkdir -p "$OUTPUT_DIR"
+
+# Kill Chrome first to avoid WebSocket errors
+pkill -f "Google Chrome" 2>/dev/null || true
+sleep 1
+
+# Extract as markdown (easier for AI to parse than raw HTML)
+"$CHROME_EXTRACT" "$MOHAWK_URL" --format=markdown > "$OUTPUT_FILE" 2>/dev/null
+
+echo "$OUTPUT_FILE"

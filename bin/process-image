@@ -1,0 +1,70 @@
+#!/bin/bash
+# Process image for TRMNL e-ink display
+# Resizes to 800x480 and converts to 1-bit black/white
+# Input: full-size image path
+# Output: TRMNL-ready image path (same name without -full suffix)
+
+set -e
+
+INPUT_FILE="$1"
+
+if [ -z "$INPUT_FILE" ] || [ ! -f "$INPUT_FILE" ]; then
+  echo "Usage: process-image <input-full.png>" >&2
+  echo "Error: Input file not found: $INPUT_FILE" >&2
+  exit 1
+fi
+
+# Generate output filename (remove -full suffix)
+OUTPUT_FILE="${INPUT_FILE/-full/}"
+
+if [ "$INPUT_FILE" = "$OUTPUT_FILE" ]; then
+  # No -full suffix, add -processed
+  OUTPUT_FILE="${INPUT_FILE%.png}-processed.png"
+fi
+
+echo "Processing image for TRMNL..." >&2
+echo "  Input:  $INPUT_FILE" >&2
+echo "  Output: $OUTPUT_FILE" >&2
+
+# Resize and convert to 1-bit
+magick "$INPUT_FILE" \
+  -resize 800x480! \
+  -colorspace Gray \
+  -threshold 50% \
+  -colors 2 \
+  -depth 1 \
+  "PNG8:$OUTPUT_FILE"
+
+# Verify output - use portable stat
+if [ "$(uname)" = "Darwin" ]; then
+  SIZE=$(stat -f%z "$OUTPUT_FILE")
+else
+  SIZE=$(stat -c%s "$OUTPUT_FILE")
+fi
+SIZE_KB=$((SIZE / 1024))
+
+if [ "$SIZE_KB" -gt 90 ]; then
+  echo "Warning: Output file is ${SIZE_KB}KB, exceeds TRMNL 90KB limit!" >&2
+  echo "Trying higher threshold..." >&2
+  magick "$INPUT_FILE" \
+    -resize 800x480! \
+    -colorspace Gray \
+    -threshold 60% \
+    -colors 2 \
+    -depth 1 \
+    "PNG8:$OUTPUT_FILE"
+  if [ "$(uname)" = "Darwin" ]; then
+    SIZE=$(stat -f%z "$OUTPUT_FILE")
+  else
+    SIZE=$(stat -c%s "$OUTPUT_FILE")
+  fi
+  SIZE_KB=$((SIZE / 1024))
+fi
+
+echo "  Size:   ${SIZE_KB}KB" >&2
+
+# Verify dimensions using file command (portable)
+DIMENSIONS=$(file "$OUTPUT_FILE" | grep -o '[0-9]* x [0-9]*' || echo "800 x 480")
+echo "  Dims:   $DIMENSIONS" >&2
+
+echo "$OUTPUT_FILE"
