@@ -1,61 +1,30 @@
 #!/bin/bash
 
 # Run script for TRMNL Image Agent
-# Checks for required environment variables and runs Claude to update the display
+# Uses modular bin scripts for fast updates
 
 set -e
 
-ENV_FILE=".env"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# Check if .env file exists
-if [ ! -f "$ENV_FILE" ]; then
-    echo "Error: .env file not found."
-    echo "Run ./setup.sh first to create the environment configuration."
-    exit 1
-fi
+# Check if 1Password CLI is available for secrets
+if ! command -v op &> /dev/null; then
+    echo "Warning: 1Password CLI not found. Checking for environment variables..."
 
-# Required environment variables
-REQUIRED_VARS=(
-    "GEMINI_API_KEY"
-    "TRMNL_WEBHOOK_URL"
-    "TRMNL_HOME_WEBHOOK_URL"
-)
-
-# Check if dotenvx is installed
-if ! command -v dotenvx &> /dev/null; then
-    echo "Error: dotenvx is not installed."
-    echo "Install it with: npm install -g @dotenvx/dotenvx"
-    exit 1
-fi
-
-# Load .env and check for required variables
-echo "Checking required environment variables..."
-MISSING_VARS=()
-
-for var in "${REQUIRED_VARS[@]}"; do
-    # Use dotenvx to check if variable is set in .env
-    value=$(dotenvx get "$var" 2>/dev/null || echo "")
-    if [ -z "$value" ]; then
-        MISSING_VARS+=("$var")
+    # Check required env vars
+    if [ -z "$GEMINI_API_KEY" ]; then
+        echo "Error: GEMINI_API_KEY not set"
+        exit 1
     fi
-done
-
-if [ ${#MISSING_VARS[@]} -ne 0 ]; then
-    echo "Error: Missing required environment variables:"
-    for var in "${MISSING_VARS[@]}"; do
-        echo "  - $var"
-    done
-    echo ""
-    echo "Please update your .env file with the missing values."
-    exit 1
+    if [ -z "$TRMNL_WEBHOOK_URL" ]; then
+        echo "Error: TRMNL_WEBHOOK_URL not set"
+        exit 1
+    fi
 fi
 
-echo "All required environment variables are set."
-echo "Running Claude to update the display..."
-echo ""
-
-dotenvx run -- claude --model sonnet --verbose -p --output-format=stream-json --dangerously-skip-permissions \
-  "update the image and push it to the display, then update the readme and commit and push everything"
+# Run the modular update script
+"$SCRIPT_DIR/bin/update-display"
 
 echo ""
-echo "Done."
+echo "To update README and commit, run:"
+echo "  git add README.md output/ && git commit -m 'Update TRMNL image' && git push"
