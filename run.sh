@@ -26,9 +26,20 @@ if [ -z "$TRMNL_WEBHOOK_URL" ]; then
     exit 1
 fi
 
-# Run the modular update script
-"$SCRIPT_DIR/bin/update-display"
+# Run the modular update script and capture the final image path
+FINAL_IMAGE=$("$SCRIPT_DIR/bin/update-display" | tail -1)
+
+# Update README.md with the new image path
+if [ -n "$FINAL_IMAGE" ] && [ -f "$FINAL_IMAGE" ]; then
+    # Convert absolute path to relative path from repo root
+    RELATIVE_PATH="${FINAL_IMAGE#$SCRIPT_DIR/}"
+
+    # Update the image reference in README.md
+    sed -i '' "s|!\[Latest TRMNL Image\](output/[^)]*)|![Latest TRMNL Image]($RELATIVE_PATH)|" "$SCRIPT_DIR/README.md"
+    echo ""
+    echo "Updated README.md with: $RELATIVE_PATH"
+fi
 
 echo ""
-echo "To update README and commit, run:"
+echo "To commit and push, run:"
 echo "  git add README.md output/ && git commit -m 'Update TRMNL image' && git push"
