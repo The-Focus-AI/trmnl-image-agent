@@ -4,7 +4,7 @@ Generate and push custom images to TRMNL e-ink displays.
 
 ## Current Image
 
-![Latest TRMNL Image](output/2026-01/2026-01-30-14-00.png)
+![Latest TRMNL Image](output/2026-01/2026-01-30-16-00.png)
 
 ## Prerequisites
 
