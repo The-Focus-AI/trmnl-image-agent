@@ -4,13 +4,21 @@ Generate and push custom images to TRMNL e-ink displays.
 
 ## Current Image
 
-![Latest TRMNL Image](output/2026-01/2026-01-30-16-00.png)
+![Latest TRMNL Image](output/latest.png)
+
+## How It Works
+
+This project generates dashboard images and serves them via **GitHub Pages**. Your TRMNL device uses the **Image Display plugin** to pull the latest image from:
+
+```
+https://the-focus-ai.github.io/trmnl-image-agent/latest.png
+```
+
+This is more reliable than the experimental Webhook Image plugin because TRMNL pulls the image on its schedule rather than relying on webhook pushes.
 
 ## Prerequisites
 
 - A TRMNL device
-- TRMNL account with Developer Edition add-on ($19 one-time)
-- Webhook Image plugin enabled
 - Claude Code with the following plugins:
   - **nano-banana** - AI image generation using Google Gemini
   - **chrome-driver** - Browser automation for screenshots
@@ -28,30 +36,35 @@ Generate and push custom images to TRMNL e-ink displays.
 
 Then restart Claude Code.
 
-## Setup
+## TRMNL Setup (Image Display Plugin)
 
-### Configure Environment
+1. Log in to your TRMNL account at [usetrmnl.com](https://usetrmnl.com)
+2. Go to **Plugins** > **Image Display**
+3. Click **Add to my plugins**
+4. Enter the image URL:
+   ```
+   https://the-focus-ai.github.io/trmnl-image-agent/latest.png
+   ```
+5. Set a refresh interval (e.g., 15-30 minutes)
+6. Save and add to your device's playlist
 
-Get the webhook URL from 1Password:
-
-```bash
-export TRMNL_WEBHOOK_URL=$(op read "op://Development/Market TRMNL Webhook/notesPlain")
-```
+That's it! TRMNL will now pull the latest image whenever the display refreshes.
 
 ## Usage
 
-Run the agent to generate a new image and push it to your TRMNL display:
+Run the agent to generate a new image:
 
 ```bash
 claude --verbose -p --output-format=stream-json --dangerously-skip-permissions \
-  "update the image and push it to the display, then update the readme and commit and push everything"
+  "update the image, then commit and push everything"
 ```
 
 This will:
 1. Generate a new dashboard image using AI
-2. Push it to your TRMNL display via webhook
-3. Update the README with the latest image
-4. Commit and push changes to git
+2. Process it for e-ink (800x480, 1-bit)
+3. Copy it to `output/latest.png`
+4. Commit and push to GitHub
+5. GitHub Pages automatically deploys the new image
 
 ## Image Requirements
 
@@ -80,13 +93,21 @@ convert input.jpg \
   PNG8:output.png
 ```
 
-## Rate Limits
+## GitHub Pages Setup (One-Time)
 
-- **12 uploads per hour** per webhook
-- Plan your update frequency accordingly
+To enable GitHub Pages for your fork:
+
+1. Go to your repo's **Settings** > **Pages**
+2. Under **Source**, select **GitHub Actions**
+3. The workflow will automatically deploy when you push to `main`
+
+The image will be available at:
+```
+https://<your-username>.github.io/<repo-name>/latest.png
+```
 
 ## Resources
 
-- [TRMNL Webhook Image Docs](https://help.usetrmnl.com/en/articles/13213669-webhook-image-experimental)
+- [TRMNL Image Display Plugin](https://help.usetrmnl.com/en/articles/11479051-image-display)
 - [TRMNL Design Framework](https://usetrmnl.com/framework)
 - [E-Ink Image Preparation Guide](https://learn.adafruit.com/preparing-graphics-for-e-ink-displays)

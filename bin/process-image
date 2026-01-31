@@ -67,4 +67,11 @@ echo "  Size:   ${SIZE_KB}KB" >&2
 DIMENSIONS=$(file "$OUTPUT_FILE" | grep -o '[0-9]* x [0-9]*' || echo "800 x 480")
 echo "  Dims:   $DIMENSIONS" >&2
 
+# Copy to latest.png for GitHub Pages / Image Display plugin
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+LATEST_FILE="$REPO_ROOT/output/latest.png"
+cp "$OUTPUT_FILE" "$LATEST_FILE"
+echo "  Latest: $LATEST_FILE" >&2
+
 echo "$OUTPUT_FILE"

@@ -1,6 +1,7 @@
 #!/bin/bash
 # Main script to update TRMNL display
-# Runs all steps: fetch → parse → prompt → generate → process → push
+# Runs all steps: fetch → parse → prompt → generate → process
+# Then commit/push to deploy via GitHub Pages
 
 set -e
 
@@ -13,21 +14,21 @@ echo "=========================================="
 echo ""
 
 # Step 1: Fetch all raw data in parallel
-echo "Step 1/6: Fetching raw data (parallel)..."
+echo "Step 1/5: Fetching raw data (parallel)..."
 "$SCRIPT_DIR/fetch-all"
 FETCH_TIME=$(date +%s)
 echo "  Done in $((FETCH_TIME - START_TIME))s"
 echo ""
 
 # Step 2: Parse data with Haiku
-echo "Step 2/6: Parsing data with AI..."
+echo "Step 2/5: Parsing data with AI..."
 "$SCRIPT_DIR/parse-data" > /dev/null
 PARSE_TIME=$(date +%s)
 echo "  Done in $((PARSE_TIME - FETCH_TIME))s"
 echo ""
 
 # Step 3: Build prompt from parsed data
-echo "Step 3/6: Building image prompt..."
+echo "Step 3/5: Building image prompt..."
 "$SCRIPT_DIR/build-prompt" > /dev/null
 PROMPT_FILE="/tmp/trmnl-prompt.txt"
 BUILD_TIME=$(date +%s)
@@ -36,30 +37,23 @@ echo "  Done in $((BUILD_TIME - PARSE_TIME))s"
 echo ""
 
 # Step 4: Generate image with AI
-echo "Step 4/6: Generating image..."
+echo "Step 4/5: Generating image..."
 FULL_IMAGE=$("$SCRIPT_DIR/generate-image" "$PROMPT_FILE" | tail -1)
 GEN_TIME=$(date +%s)
 echo "  Output: $FULL_IMAGE"
 echo "  Done in $((GEN_TIME - BUILD_TIME))s"
 echo ""
 
-# Step 5: Process image for TRMNL
-echo "Step 5/6: Processing image for e-ink..."
+# Step 5: Process image for TRMNL (also copies to latest.png)
+echo "Step 5/5: Processing image for e-ink..."
 FINAL_IMAGE=$("$SCRIPT_DIR/process-image" "$FULL_IMAGE" | tail -1)
 PROC_TIME=$(date +%s)
 echo "  Output: $FINAL_IMAGE"
 echo "  Done in $((PROC_TIME - GEN_TIME))s"
 echo ""
 
-# Step 6: Push to displays
-echo "Step 6/6: Pushing to TRMNL displays..."
-"$SCRIPT_DIR/push-image" "$FINAL_IMAGE"
-PUSH_TIME=$(date +%s)
-echo "  Done in $((PUSH_TIME - PROC_TIME))s"
-echo ""
-
 # Summary
-TOTAL_TIME=$((PUSH_TIME - START_TIME))
+TOTAL_TIME=$((PROC_TIME - START_TIME))
 echo "=========================================="
 echo "Complete! Total time: ${TOTAL_TIME}s"
 echo ""
@@ -69,9 +63,11 @@ echo "  Parse:    $((PARSE_TIME - FETCH_TIME))s"
 echo "  Prompt:   $((BUILD_TIME - PARSE_TIME))s"
 echo "  Generate: $((GEN_TIME - BUILD_TIME))s"
 echo "  Process:  $((PROC_TIME - GEN_TIME))s"
-echo "  Push:     $((PUSH_TIME - PROC_TIME))s"
 echo ""
 echo "Final image: $FINAL_IMAGE"
+echo "Latest:      output/latest.png"
+echo ""
+echo "Commit and push to deploy via GitHub Pages"
 echo "=========================================="
 
 # Output the final image path for scripting
