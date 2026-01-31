@@ -71,6 +71,8 @@ echo "  Dims:   $DIMENSIONS" >&2
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 LATEST_FILE="$REPO_ROOT/output/latest.png"
+# Remove any existing file/symlink first to ensure clean copy
+rm -f "$LATEST_FILE"
 cp "$OUTPUT_FILE" "$LATEST_FILE"
 echo "  Latest: $LATEST_FILE" >&2
 
