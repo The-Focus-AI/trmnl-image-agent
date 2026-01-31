@@ -511,9 +511,9 @@ magick output/$(date +%Y-%m)/$(date +%Y-%m-%d-%H-%M)-full.png \
 - `-resize 800x480!` - Force exact 800x480 dimensions (the `!` ignores aspect ratio)
 - `-threshold 50%` - Convert to pure black/white (adjust if needed: higher = more white)
 - `-colors 2 -depth 1` - Ensure 1-bit color depth
-- `PNG8:` - Output as 8-bit indexed PNG (compatible with TRMNL webhook)
+- `PNG8:` - Output as 8-bit indexed PNG (compatible with TRMNL / GitHub Pages)
 
-> ⚠️ **IMPORTANT:** The TRMNL webhook has a **90KB file size limit**. The PNG8 format with 2 colors typically produces files under 50KB, which is well within the limit. If your file is too large, increase the threshold or simplify the image.
+> ⚠️ **IMPORTANT:** Keep images under **90KB** for reliable display. The PNG8 format with 2 colors typically produces files under 50KB. If your file is too large, increase the threshold or simplify the image.
 
 **Verify the output:**
 ```bash
@@ -525,60 +525,29 @@ file output/$(date +%Y-%m)/$(date +%Y-%m-%d-%H-%M).png
 
 ---
 
-## Step 7: Push to TRMNL Devices
+## Step 7: Copy to latest.png and Deploy via GitHub Pages
 
-Push the image to **both** TRMNL devices using curl with `--data-binary` and `Content-Type: image/png` header.
-
-### 7a. Push to Market TRMNL
+The `bin/process-image` script automatically copies the TRMNL-ready image to `output/latest.png`. Deploy by committing and pushing:
 
 ```bash
-export MARKET_WEBHOOK=$(op read "op://Personal/Market TRMNL Webhook/notesPlain")
-
-curl -X POST \
-  -H "Content-Type: image/png" \
-  --data-binary @output/$(date +%Y-%m)/$(date +%Y-%m-%d-%H-%M).png \
-  "$MARKET_WEBHOOK"
+git add output/
+git commit -m "Update TRMNL image"
+git push
 ```
 
-### 7b. Push to Home TRMNL
+GitHub Actions will deploy to GitHub Pages. TRMNL devices using the **Image Display** plugin will pull from:
 
-```bash
-export HOME_WEBHOOK=$(op read "op://Personal/Home TRMNL Webook/notesPlain")
-
-curl -X POST \
-  -H "Content-Type: image/png" \
-  --data-binary @output/$(date +%Y-%m)/$(date +%Y-%m-%d-%H-%M).png \
-  "$HOME_WEBHOOK"
+```
+https://the-focus-ai.github.io/trmnl-image-agent/latest.png
 ```
 
-**Expected response (for each):**
-```json
-{"data":{"message":"Image uploaded successfully"}}
-```
-
-**Common errors:**
-- `"Image file size exceeds device limit (90 KB)"` - Re-run Step 6 with stricter compression
-- `"Unsupported image format"` - Ensure using PNG8 format with 8-bit colormap
-- `"No image data received"` - Don't use multipart form data; use `--data-binary` with Content-Type header
-
-**Limits:** 800x480 pixels, PNG/JPEG/BMP, **max 90KB**, 12 uploads/hour per device
+**Limits:** 800x480 pixels, PNG/JPEG/BMP, **max 90KB**
 
 ---
 
-## Step 8: Update README (ALWAYS DO THIS!)
+## Step 8: README
 
-After generating a new image, **always update README.md** to show the latest image:
-
-1. **Update the image path in README.md:**
-   - Find the line: `![Latest TRMNL Image](output/...)`
-   - Replace with the path to your new TRMNL-ready image (the resized one, not the -full.png)
-
-2. **Example:**
-   ```markdown
-   ![Latest TRMNL Image](output/2026-01/2026-01-23-16-15.png)
-   ```
-
-> ⚠️ **GitHub doesn't follow symlinks**, so the README must point to the actual file path
+The README references `output/latest.png`; no manual path updates needed. The Image Display plugin always fetches the same URL.
 
 ---
 
@@ -586,6 +555,7 @@ After generating a new image, **always update README.md** to show the latest ima
 
 ```
 output/
+├── latest.png                       # Copy of current image (GitHub Pages / Image Display)
 ├── 2026-01/
 │   ├── 2026-01-23-09-52-full.png    # Original from nano-banana (larger)
 │   ├── 2026-01-23-09-52.png         # TRMNL-ready (800x480, 1-bit B&W)

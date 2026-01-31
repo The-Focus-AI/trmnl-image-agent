@@ -14,8 +14,6 @@ This project generates dashboard images and serves them via **GitHub Pages**. Yo
 https://the-focus-ai.github.io/trmnl-image-agent/latest.png
 ```
 
-This is more reliable than the experimental Webhook Image plugin because TRMNL pulls the image on its schedule rather than relying on webhook pushes.
-
 ## Prerequisites
 
 - A TRMNL device
