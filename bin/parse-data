@@ -19,9 +19,9 @@ if [ ! -f "$DATA_DIR/mohawk.txt" ]; then
   exit 1
 fi
 
-# Get current date/time
-CURRENT_DATE=$(date "+%a %d %b" | tr '[:lower:]' '[:upper:]')
-CURRENT_TIME=$(date "+%-I:%M %p")
+# Get current date/time in Eastern timezone
+CURRENT_DATE=$(TZ='America/New_York' date "+%a %d %b" | tr '[:lower:]' '[:upper:]')
+CURRENT_TIME=$(TZ='America/New_York' date "+%-I:%M %p")
 
 # Read sun/moon data (already JSON)
 SUN_MOON=$(cat "$DATA_DIR/sun-moon.json" 2>/dev/null || echo '{}')
