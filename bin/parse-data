@@ -61,6 +61,7 @@ Extract and return this exact JSON structure (NO markdown code blocks, just raw 
     \"mountain_alert\": \"<mountain operational alert or null>\"
   },
   \"mohawk\": {
+    \"status\": \"<open or closed - check if mountain/resort appears to be open for skiing>\",
     \"trails_open\": <number>,
     \"trails_total\": 27,
     \"lifts_open\": <number>,
@@ -70,13 +71,19 @@ Extract and return this exact JSON structure (NO markdown code blocks, just raw 
     \"tubing_closed\": <true or false>,
     \"night_skiing\": <true or false>
   },
+  \"maple\": {
+    \"sap_flowing\": <true if today's high > 32 AND tonight's low < 32, false otherwise>,
+    \"high\": <today's high>,
+    \"low\": <tonight's low>,
+    \"quality\": \"<ideal if high 40-50 and low 20-28, good if high 33-55 and low < 32, poor otherwise>\"
+  },
   \"sun_moon\": {
     \"sunrise\": \"<time like 7:15 AM>\",
     \"sunset\": \"<time like 5:05 PM>\",
     \"moon_phase\": \"<phase name>\"
   },
   \"banner\": {
-    \"type\": \"<powder_day|storm_warning|cold_advisory|mountain_alert|normal>\",
+    \"type\": \"<powder_day|storm_warning|cold_advisory|mountain_alert|sap_flowing|normal>\",
     \"text\": \"<banner text to display or null for decorative border>\"
   }
 }
@@ -86,12 +93,16 @@ IMPORTANT RULES:
 2. If there's a winter storm warning, set banner type to \"storm_warning\"
 3. Count trails by looking for 'Trail Open' markers
 4. Look for phrases like '20\" of fresh snow' or 'brought about 20\"'
-5. Return ONLY the JSON object, no markdown code blocks, no backticks"
+5. For maple: sap_flowing is true when high > 32°F AND low < 32°F. Quality is \"ideal\" when high is 40-50 and low is 20-28, \"good\" when high is 33-55 and low < 32, \"poor\" otherwise.
+6. For mohawk status: set to \"closed\" if the page says closed for season, no trails open, or similar. Set to \"open\" if skiing appears active.
+7. If mohawk is closed AND sap is flowing, set banner type to \"sap_flowing\" with text like \"🍁 SAP IS FLOWING • HIGH <high>° LOW <low>° 🍁\"
+8. Return ONLY the JSON object, no markdown code blocks, no backticks"
 
 echo "Parsing data with Claude Haiku..." >&2
 
 # Call Claude with haiku model and text output format
-RESULT=$(echo "$PROMPT" | claude --model haiku -p 2>/dev/null)
+# Unset CLAUDECODE to allow running from within a Claude Code session
+RESULT=$(echo "$PROMPT" | CLAUDECODE= claude --model haiku -p 2>/dev/null)
 
 # Extract JSON from the result - handle markdown code blocks
 CLEAN_RESULT=$(echo "$RESULT" | sed 's/^```json//' | sed 's/^```//' | sed 's/```$//')

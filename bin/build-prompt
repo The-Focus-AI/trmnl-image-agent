@@ -32,12 +32,16 @@ LOW=$(jq -r '.weather.low // 20' "$INPUT_FILE")
 WEATHER_ALERT=$(jq -r '.alerts.weather_alert // empty' "$INPUT_FILE")
 MOUNTAIN_ALERT=$(jq -r '.alerts.mountain_alert // empty' "$INPUT_FILE")
 
+MOHAWK_STATUS=$(jq -r '.mohawk.status // "open"' "$INPUT_FILE")
 TRAILS_OPEN=$(jq -r '.mohawk.trails_open // 27' "$INPUT_FILE")
 TRAILS_TOTAL=$(jq -r '.mohawk.trails_total // 27' "$INPUT_FILE")
 LIFTS_OPEN=$(jq -r '.mohawk.lifts_open // 6' "$INPUT_FILE")
 BASE_DEPTH=$(jq -r '.mohawk.base_depth // 30' "$INPUT_FILE")
 SURFACE=$(jq -r '.mohawk.surface // "VARIABLE"' "$INPUT_FILE")
 FRESH_SNOW=$(jq -r '.mohawk.fresh_snow // empty' "$INPUT_FILE")
+
+SAP_FLOWING=$(jq -r '.maple.sap_flowing // false' "$INPUT_FILE")
+MAPLE_QUALITY=$(jq -r '.maple.quality // "poor"' "$INPUT_FILE" | tr '[:lower:]' '[:upper:]')
 
 SUNRISE=$(jq -r '.sun_moon.sunrise // "7:15 AM"' "$INPUT_FILE")
 SUNSET=$(jq -r '.sun_moon.sunset // "5:00 PM"' "$INPUT_FILE")
@@ -46,14 +50,30 @@ MOON_PHASE=$(jq -r '.sun_moon.moon_phase // "first quarter"' "$INPUT_FILE")
 BANNER_TYPE=$(jq -r '.banner.type // "normal"' "$INPUT_FILE")
 BANNER_TEXT=$(jq -r '.banner.text // empty' "$INPUT_FILE")
 
-# Build scene modifier based on conditions
-SCENE_MODIFIER="pine trees covered in snow (black line hatching for tree details, white for snow), ski lift chairs visible, and a skier carving down a groomed trail"
+# Determine display mode: maple, ski, or blended
+# Mohawk closed + sap flowing = full maple mode
+# Mohawk open + sap flowing = blended (both)
+# Otherwise = ski mode
+if [ "$MOHAWK_STATUS" = "closed" ] && [ "$SAP_FLOWING" = "true" ]; then
+  DISPLAY_MODE="maple"
+elif [ "$SAP_FLOWING" = "true" ]; then
+  DISPLAY_MODE="blended"
+else
+  DISPLAY_MODE="ski"
+fi
 
-if [ "$BANNER_TYPE" = "powder_day" ]; then
+# Build scene modifier based on conditions and display mode
+if [ "$DISPLAY_MODE" = "maple" ]; then
+  SCENE_MODIFIER="sugar maple trees with sap buckets and tubing lines attached to trunks, a rustic sugar house with steam rising from the cupola, stacked firewood, muddy path with patches of melting snow, bare branches with early buds starting to show, rolling Connecticut hills in background"
+elif [ "$DISPLAY_MODE" = "blended" ]; then
+  SCENE_MODIFIER="split scene - left side shows ski slopes with pine trees and a skier, right side transitions to sugar maples with sap buckets hanging from trunks and a small sugar house with steam rising, patches of snow melting in the foreground"
+elif [ "$BANNER_TYPE" = "powder_day" ]; then
   SCENE_MODIFIER="pine trees heavily laden with fresh snow, skier spraying powder while carving down a trail leaving a white powder spray behind them"
   SURFACE="POWDER"
 elif [ "$BANNER_TYPE" = "storm_warning" ]; then
   SCENE_MODIFIER="pine trees covered in snow, ski lift chairs visible, ominous clouds suggested by dense hatching on the horizon indicating incoming storm"
+else
+  SCENE_MODIFIER="pine trees covered in snow (black line hatching for tree details, white for snow), ski lift chairs visible, and a skier carving down a groomed trail"
 fi
 
 # Build wind chill sign if significant
@@ -82,7 +102,13 @@ fi
 cat > "$OUTPUT_FILE" << EOF
 Black and white 1-bit line drawing in woodcut/linocut etching style for e-ink display. Wide 16:9 landscape format. Use ONLY pure black and pure white - no grays.
 
-SCENE: Snowy New England ski mountain landscape with ski slopes, ${SCENE_MODIFIER}. Rocky outcrops and rolling hills of the Berkshires in background with black hatching.
+$(if [ "$DISPLAY_MODE" = "maple" ]; then
+echo "SCENE: Late winter New England landscape transitioning to spring, ${SCENE_MODIFIER}. Rolling hills of the Litchfield Hills in background with black hatching."
+elif [ "$DISPLAY_MODE" = "blended" ]; then
+echo "SCENE: New England landscape in late ski season transitioning to maple season, ${SCENE_MODIFIER}. Rolling hills of the Berkshires/Litchfield Hills in background with black hatching."
+else
+echo "SCENE: Snowy New England ski mountain landscape with ski slopes, ${SCENE_MODIFIER}. Rocky outcrops and rolling hills of the Berkshires in background with black hatching."
+fi)
 
 LEFT SIDE - Rustic wooden signpost with multiple signs showing:
 - '${DATE}' (top sign, arrow style pointing right)
@@ -96,17 +122,43 @@ TOP RIGHT - Three framed icons in decorative vintage borders:
 - Moon phase icon showing ${MOON_PHASE} moon
 - Sunset icon with '${SUNSET}'
 
+$(if [ "$DISPLAY_MODE" = "maple" ]; then
+cat << BOARD
+BOTTOM RIGHT - Rustic wooden maple season board showing:
+- 'MAPLE SEASON' as header
+- 'SAP: FLOWING' in bold
+- 'QUALITY: ${MAPLE_QUALITY}'
+- 'HIGH ${HIGH}°F / LOW ${LOW}°F'
+BOARD
+elif [ "$DISPLAY_MODE" = "blended" ]; then
+cat << BOARD
+BOTTOM RIGHT - Two small wooden boards stacked:
+Top board - 'MOHAWK MTN':
+- '${TRAILS_OPEN}/${TRAILS_TOTAL} TRAILS • ${SURFACE}'
+Bottom board - 'MAPLE SEASON':
+- 'SAP: FLOWING • ${MAPLE_QUALITY}'
+BOARD
+else
+cat << BOARD
 BOTTOM RIGHT - Wooden ski conditions board showing:
 - 'MOHAWK MTN' as header
 - '${TRAILS_OPEN}/${TRAILS_TOTAL} TRAILS'
 - '${BASE_DEPTH}" BASE'
 - '${SURFACE}'
+BOARD
+fi)
 
 ${BOTTOM_BANNER}
 
 BOTTOM LEFT CORNER - Small text in a simple frame reading 'Updated ${TIMESTAMP}'
 
-Style: 1-bit black and white line drawing. Use ONLY pure black and pure white - no gray tones. All shading with hatching/cross-hatching. Woodcut/linocut etching aesthetic. Crisp black text on white. Vintage ski poster style.
+$(if [ "$DISPLAY_MODE" = "maple" ]; then
+echo "Style: 1-bit black and white line drawing. Use ONLY pure black and pure white - no gray tones. All shading with hatching/cross-hatching. Woodcut/linocut etching aesthetic. Crisp black text on white. Vintage New England sugar house poster style."
+elif [ "$DISPLAY_MODE" = "blended" ]; then
+echo "Style: 1-bit black and white line drawing. Use ONLY pure black and pure white - no gray tones. All shading with hatching/cross-hatching. Woodcut/linocut etching aesthetic. Crisp black text on white. Vintage New England seasonal poster style."
+else
+echo "Style: 1-bit black and white line drawing. Use ONLY pure black and pure white - no gray tones. All shading with hatching/cross-hatching. Woodcut/linocut etching aesthetic. Crisp black text on white. Vintage ski poster style."
+fi)
 EOF
 
 echo "Prompt written to $OUTPUT_FILE" >&2

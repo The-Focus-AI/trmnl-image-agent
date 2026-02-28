@@ -14,38 +14,36 @@ TODAY=$(date +%Y-%m-%d)
 DAY_OF_YEAR=$(date +%j)
 YEAR=$(date +%Y)
 
-# Calculate approximate sunrise/sunset for Cornwall, CT in January
-# Based on typical times: sunrise ~7:10-7:20 AM, sunset ~4:50-5:10 PM
-# These shift by about 1 minute per day in late January
-
-# Day 1 (Jan 1) sunrise: 7:23 AM, sunset: 4:35 PM
-# Day 31 (Jan 31) sunrise: 7:02 AM, sunset: 5:08 PM
-# Linear interpolation
-
-DAY_OF_MONTH=$(date +%d | sed 's/^0//')
-
-# January sunrise: starts at 7:23, ends at 7:02 (21 min change over 30 days)
-SUNRISE_HOUR=7
-SUNRISE_MIN=$((23 - (DAY_OF_MONTH * 21 / 30)))
-if [ $SUNRISE_MIN -lt 10 ]; then
-  SUNRISE="7:0${SUNRISE_MIN} AM"
-else
-  SUNRISE="7:${SUNRISE_MIN} AM"
-fi
-
-# January sunset: starts at 4:35, ends at 5:08 (33 min change over 30 days)
-SUNSET_MIN=$((35 + (DAY_OF_MONTH * 33 / 30)))
-if [ $SUNSET_MIN -ge 60 ]; then
-  SUNSET_HOUR=5
-  SUNSET_MIN=$((SUNSET_MIN - 60))
-else
-  SUNSET_HOUR=4
-fi
-if [ $SUNSET_MIN -lt 10 ]; then
-  SUNSET="${SUNSET_HOUR}:0${SUNSET_MIN} PM"
-else
-  SUNSET="${SUNSET_HOUR}:${SUNSET_MIN} PM"
-fi
+# Calculate approximate sunrise/sunset for Cornwall, CT year-round
+# Uses simplified solar equation via python for trig functions
+# Use pipe-delimited output to avoid word-splitting on spaces in "6:39 AM"
+SUN_TIMES=$(python3 -c "
+import math
+lat = 41.8456
+doy = int('$(date +%j)'.lstrip('0') or '1')
+# Solar declination
+decl = -23.45 * math.cos(math.radians(360/365 * (doy + 10)))
+decl_rad = math.radians(decl)
+lat_rad = math.radians(lat)
+# Hour angle
+ha = math.degrees(math.acos(-math.tan(lat_rad) * math.tan(decl_rad)))
+# Solar noon in hours UTC (Cornwall ~73.3W => ~4.89h offset)
+solar_noon = 12.0 + 73.3284 / 15.0
+rise_utc = solar_noon - ha / 15.0
+set_utc = solar_noon + ha / 15.0
+# Convert to Eastern (UTC-5)
+rise_et = rise_utc - 5.0
+set_et = set_utc - 5.0
+def fmt(h):
+    if h < 0: h += 24
+    period = 'AM' if h < 12 else 'PM'
+    h12 = int(h) % 12 or 12
+    m = int((h - int(h)) * 60)
+    return f'{h12}:{m:02d} {period}'
+print(f'{fmt(rise_et)}|{fmt(set_et)}')
+")
+SUNRISE="${SUN_TIMES%%|*}"
+SUNSET="${SUN_TIMES##*|}"
 
 # Calculate moon phase
 # New moon was on Jan 29, 2025. Lunar cycle is 29.53 days.
@@ -53,7 +51,8 @@ fi
 DAYS_SINCE_REF=$(( ($(date +%s) - $(date -j -f "%Y-%m-%d" "2025-01-29" +%s 2>/dev/null || date -d "2025-01-29" +%s)) / 86400 ))
 LUNAR_CYCLE=29.53
 PHASE_DAY=$(echo "$DAYS_SINCE_REF % 29.53" | bc 2>/dev/null || echo "$((DAYS_SINCE_REF % 30))")
-PHASE_DAY_INT=${PHASE_DAY%.*}
+# bc may return ".11" (no leading zero) - ensure we get an integer
+PHASE_DAY_INT=$(printf "%.0f" "$PHASE_DAY" 2>/dev/null || echo "0")
 
 # Determine moon phase name
 if [ "$PHASE_DAY_INT" -lt 2 ]; then

@@ -6,7 +6,7 @@ set -e
 
 OUTPUT_DIR="/tmp/trmnl-data"
 OUTPUT_FILE="$OUTPUT_DIR/mohawk.txt"
-CHROME_EXTRACT="/Users/wschenk/.claude/plugins/cache/focus-marketplace/chrome-driver/0.1.0/bin/extract"
+CHROME_EXTRACT="/Users/wschenk/.claude/plugins/cache/focus-marketplace/chrome-driver/0.2.0/bin/extract"
 MOHAWK_URL="https://www.mohawkmtn.com/snow-report/"
 
 mkdir -p "$OUTPUT_DIR"
