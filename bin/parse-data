@@ -144,4 +144,45 @@ else:
 " > "$OUTPUT_FILE" 2>/dev/null || echo "$CLEAN_RESULT" > "$OUTPUT_FILE"
 fi
 
+# Override maple fields deterministically (LLM gets these wrong)
+# Sap flows when it freezes at night and thaws during the day
+HIGH=$(jq -r '.weather.high // 32' "$OUTPUT_FILE")
+LOW=$(jq -r '.weather.low // 32' "$OUTPUT_FILE")
+
+if [ "$HIGH" -gt 32 ] 2>/dev/null && [ "$LOW" -lt 32 ] 2>/dev/null; then
+  SAP_FLOWING=true
+else
+  SAP_FLOWING=false
+fi
+
+if [ "$SAP_FLOWING" = "true" ] && [ "$HIGH" -ge 40 ] 2>/dev/null && [ "$HIGH" -le 50 ] 2>/dev/null && [ "$LOW" -ge 20 ] 2>/dev/null && [ "$LOW" -le 28 ] 2>/dev/null; then
+  MAPLE_QUALITY="ideal"
+elif [ "$SAP_FLOWING" = "true" ] && [ "$HIGH" -ge 33 ] 2>/dev/null && [ "$HIGH" -le 55 ] 2>/dev/null; then
+  MAPLE_QUALITY="good"
+else
+  MAPLE_QUALITY="poor"
+fi
+
+# Patch maple fields in JSON
+jq --argjson sap "$SAP_FLOWING" --arg quality "$MAPLE_QUALITY" \
+  '.maple.sap_flowing = $sap | .maple.quality = $quality' "$OUTPUT_FILE" > "${OUTPUT_FILE}.tmp" \
+  && mv "${OUTPUT_FILE}.tmp" "$OUTPUT_FILE"
+
+# Fix banner: only show sap_flowing banner if sap is actually flowing
+MOHAWK_STATUS=$(jq -r '.mohawk.status // "open"' "$OUTPUT_FILE")
+BANNER_TYPE=$(jq -r '.banner.type // "normal"' "$OUTPUT_FILE")
+
+if [ "$SAP_FLOWING" = "false" ] && [ "$BANNER_TYPE" = "sap_flowing" ]; then
+  # Sap isn't flowing, clear the sap banner
+  jq '.banner.type = "normal" | .banner.text = null' "$OUTPUT_FILE" > "${OUTPUT_FILE}.tmp" \
+    && mv "${OUTPUT_FILE}.tmp" "$OUTPUT_FILE"
+elif [ "$SAP_FLOWING" = "true" ] && [ "$MOHAWK_STATUS" = "closed" ] && [ "$BANNER_TYPE" != "sap_flowing" ]; then
+  # Sap is flowing and mountain closed, set the sap banner
+  BANNER="🍁 SAP IS FLOWING • HIGH ${HIGH}° LOW ${LOW}° 🍁"
+  jq --arg text "$BANNER" '.banner.type = "sap_flowing" | .banner.text = $text' "$OUTPUT_FILE" > "${OUTPUT_FILE}.tmp" \
+    && mv "${OUTPUT_FILE}.tmp" "$OUTPUT_FILE"
+fi
+
+echo "Maple override: sap_flowing=$SAP_FLOWING quality=$MAPLE_QUALITY (high=$HIGH low=$LOW)" >&2
+
 echo "$OUTPUT_FILE"
