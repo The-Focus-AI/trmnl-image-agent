@@ -1,0 +1,289 @@
+{
+  "_meta": {
+    "zone": "6a",
+    "location": "Cornwall, CT",
+    "last_frost_avg": "05-15",
+    "first_frost_avg": "10-01",
+    "notes": "Keyed by Monday date (MM-DD). Find the closest Monday on or before current date."
+  },
+  "03-02": {
+    "direct_sow": [],
+    "indoor_starts": ["peppers", "eggplant", "onions"],
+    "transplant": [],
+    "harvest": [],
+    "tasks": ["order seeds", "clean tools", "check seed starting supplies"],
+    "highlight": "ORDER SEEDS - START PEPPERS INDOORS"
+  },
+  "03-09": {
+    "direct_sow": [],
+    "indoor_starts": ["peppers", "eggplant", "celery"],
+    "transplant": [],
+    "harvest": [],
+    "tasks": ["build cold frames", "test soil pH", "plan garden layout"],
+    "highlight": "TEST SOIL - PLAN GARDEN LAYOUT"
+  },
+  "03-16": {
+    "direct_sow": [],
+    "indoor_starts": ["tomatoes", "broccoli", "cauliflower", "cabbage"],
+    "transplant": [],
+    "harvest": [],
+    "tasks": ["start tomato seeds indoors", "prepare raised beds", "prune fruit trees"],
+    "highlight": "START TOMATOES INDOORS"
+  },
+  "03-23": {
+    "direct_sow": [],
+    "indoor_starts": ["tomatoes", "lettuce", "kale", "herbs"],
+    "transplant": [],
+    "harvest": [],
+    "tasks": ["continue indoor starts", "turn compost", "prep cold frames"],
+    "highlight": "START LETTUCE & KALE INDOORS"
+  },
+  "03-30": {
+    "direct_sow": ["peas", "spinach"],
+    "indoor_starts": ["tomatoes", "basil", "marigolds"],
+    "transplant": [],
+    "harvest": [],
+    "tasks": ["direct sow peas if soil workable", "add compost to beds"],
+    "highlight": "SOW PEAS OUTDOORS IF SOIL THAWED"
+  },
+  "04-06": {
+    "direct_sow": ["peas", "spinach", "radishes", "lettuce"],
+    "indoor_starts": ["squash", "cucumbers", "melons"],
+    "transplant": [],
+    "harvest": [],
+    "tasks": ["sow cool-season crops", "harden off early seedlings", "weed beds"],
+    "highlight": "SOW COOL-SEASON CROPS OUTDOORS"
+  },
+  "04-13": {
+    "direct_sow": ["peas", "carrots", "beets", "radishes", "kale"],
+    "indoor_starts": ["squash", "cucumbers"],
+    "transplant": ["onion sets", "potatoes"],
+    "harvest": [],
+    "tasks": ["plant potatoes", "set onion sets", "mulch garlic"],
+    "highlight": "PLANT POTATOES & ONION SETS"
+  },
+  "04-20": {
+    "direct_sow": ["lettuce", "arugula", "Swiss chard", "turnips"],
+    "indoor_starts": ["flowers", "herbs"],
+    "transplant": ["broccoli", "cauliflower", "cabbage"],
+    "harvest": ["early spinach", "radishes"],
+    "tasks": ["transplant brassicas under row cover", "succession sow lettuce"],
+    "highlight": "TRANSPLANT BROCCOLI & CABBAGE"
+  },
+  "04-27": {
+    "direct_sow": ["beans (if warm)", "more lettuce", "dill"],
+    "indoor_starts": [],
+    "transplant": ["kale", "lettuce starts"],
+    "harvest": ["spinach", "radishes", "lettuce"],
+    "tasks": ["watch frost forecast closely", "harden off tomatoes"],
+    "highlight": "WATCH FROST - HARDEN OFF TOMATOES"
+  },
+  "05-04": {
+    "direct_sow": ["beans", "corn", "beets", "carrots"],
+    "indoor_starts": [],
+    "transplant": [],
+    "harvest": ["spinach", "lettuce", "radishes", "peas"],
+    "tasks": ["wait for last frost before transplanting warm crops", "succession sow"],
+    "highlight": "SOW BEANS & CORN - WATCH FROST DATES"
+  },
+  "05-11": {
+    "direct_sow": ["beans", "corn", "squash", "cucumbers"],
+    "indoor_starts": [],
+    "transplant": [],
+    "harvest": ["lettuce", "spinach", "radishes", "peas"],
+    "tasks": ["prepare tomato stakes/cages", "mulch paths"],
+    "highlight": "FROST RISK FADING - PREPARE TO TRANSPLANT"
+  },
+  "05-18": {
+    "direct_sow": ["squash", "cucumbers", "melons", "sunflowers"],
+    "indoor_starts": [],
+    "transplant": ["tomatoes", "peppers", "eggplant", "basil"],
+    "harvest": ["lettuce", "peas", "radishes"],
+    "tasks": ["transplant warm-season crops after last frost", "install stakes"],
+    "highlight": "TRANSPLANT TOMATOES & PEPPERS!"
+  },
+  "05-25": {
+    "direct_sow": ["beans", "squash", "pumpkins"],
+    "indoor_starts": [],
+    "transplant": ["remaining tomatoes", "herbs"],
+    "harvest": ["lettuce", "peas", "kale", "strawberries"],
+    "tasks": ["mulch tomatoes", "set up drip irrigation", "weed thoroughly"],
+    "highlight": "MULCH TOMATOES - SET UP IRRIGATION"
+  },
+  "06-01": {
+    "direct_sow": ["succession beans", "summer squash"],
+    "indoor_starts": [],
+    "transplant": [],
+    "harvest": ["lettuce", "peas", "strawberries", "kale"],
+    "tasks": ["succession plant beans", "trellis cucumbers", "side-dress with compost"],
+    "highlight": "SUCCESSION PLANT BEANS - TRELLIS CUKES"
+  },
+  "06-08": {
+    "direct_sow": ["succession beans", "basil", "dill"],
+    "indoor_starts": [],
+    "transplant": [],
+    "harvest": ["peas", "lettuce", "strawberries", "garlic scapes"],
+    "tasks": ["harvest garlic scapes", "thin carrots and beets", "weed"],
+    "highlight": "HARVEST GARLIC SCAPES"
+  },
+  "06-15": {
+    "direct_sow": ["succession lettuce (shade)", "beans"],
+    "indoor_starts": [],
+    "transplant": [],
+    "harvest": ["strawberries", "peas", "lettuce", "herbs"],
+    "tasks": ["shade lettuce from heat", "check for pests", "water deeply"],
+    "highlight": "SHADE LETTUCE - DEEP WATERING"
+  },
+  "06-22": {
+    "direct_sow": ["succession beans", "fall broccoli seeds"],
+    "indoor_starts": ["fall broccoli", "fall cabbage"],
+    "transplant": [],
+    "harvest": ["zucchini", "summer squash", "beans", "herbs"],
+    "tasks": ["start fall brassicas indoors", "harvest zucchini small"],
+    "highlight": "FIRST ZUCCHINI - START FALL BRASSICAS"
+  },
+  "06-29": {
+    "direct_sow": ["succession beans"],
+    "indoor_starts": ["fall broccoli", "fall cauliflower"],
+    "transplant": [],
+    "harvest": ["zucchini", "beans", "cucumbers", "herbs", "blueberries"],
+    "tasks": ["pick zucchini daily", "trellis tomatoes", "water deeply"],
+    "highlight": "BLUEBERRIES STARTING - PICK ZUCCHINI DAILY"
+  },
+  "07-07": {
+    "direct_sow": ["fall carrots", "fall beets", "succession beans"],
+    "indoor_starts": [],
+    "transplant": [],
+    "harvest": ["tomatoes (early)", "zucchini", "beans", "cucumbers", "blueberries"],
+    "tasks": ["sow fall root crops", "prune tomato suckers", "deep water"],
+    "highlight": "SOW FALL CARROTS & BEETS"
+  },
+  "07-14": {
+    "direct_sow": ["fall lettuce", "fall kale", "turnips"],
+    "indoor_starts": [],
+    "transplant": ["fall broccoli", "fall cabbage"],
+    "harvest": ["tomatoes", "zucchini", "beans", "cucumbers", "blueberries", "peppers"],
+    "tasks": ["transplant fall brassicas", "mulch heavily", "check tomato blight"],
+    "highlight": "TRANSPLANT FALL BROCCOLI - MULCH HEAVILY"
+  },
+  "07-21": {
+    "direct_sow": ["fall lettuce", "fall spinach", "kale"],
+    "indoor_starts": [],
+    "transplant": [],
+    "harvest": ["tomatoes", "peppers", "eggplant", "beans", "corn", "cucumbers"],
+    "tasks": ["harvest tomatoes regularly", "watch for blight", "water deeply"],
+    "highlight": "PEAK TOMATO SEASON - HARVEST DAILY"
+  },
+  "07-28": {
+    "direct_sow": ["fall spinach", "fall radishes"],
+    "indoor_starts": [],
+    "transplant": [],
+    "harvest": ["tomatoes", "peppers", "eggplant", "corn", "beans", "melons"],
+    "tasks": ["can/preserve tomatoes", "sow fall greens", "harvest garlic"],
+    "highlight": "HARVEST GARLIC - PRESERVE TOMATOES"
+  },
+  "08-04": {
+    "direct_sow": ["fall lettuce", "spinach", "radishes", "turnips"],
+    "indoor_starts": [],
+    "transplant": [],
+    "harvest": ["tomatoes", "peppers", "corn", "melons", "beans", "eggplant"],
+    "tasks": ["continue preserving", "sow fall greens", "remove spent plants"],
+    "highlight": "PEAK HARVEST - PRESERVE & SOW FALL GREENS"
+  },
+  "08-11": {
+    "direct_sow": ["fall spinach", "fall lettuce", "radishes"],
+    "indoor_starts": [],
+    "transplant": [],
+    "harvest": ["tomatoes", "peppers", "corn", "melons", "potatoes"],
+    "tasks": ["dig potatoes", "plant cover crops in empty beds", "preserve harvest"],
+    "highlight": "DIG POTATOES - PLANT COVER CROPS"
+  },
+  "08-18": {
+    "direct_sow": ["fall lettuce", "fall spinach", "garlic (late month)"],
+    "indoor_starts": [],
+    "transplant": [],
+    "harvest": ["tomatoes", "peppers", "winter squash (if ready)", "beans"],
+    "tasks": ["check winter squash maturity", "dry onions", "sow cover crops"],
+    "highlight": "DRY ONIONS - CHECK WINTER SQUASH"
+  },
+  "08-25": {
+    "direct_sow": ["fall radishes", "turnips"],
+    "indoor_starts": [],
+    "transplant": [],
+    "harvest": ["tomatoes", "peppers", "winter squash", "melons"],
+    "tasks": ["cure winter squash", "clean up spent beds", "sow cover crops"],
+    "highlight": "CURE WINTER SQUASH - CLEAN UP BEDS"
+  },
+  "09-01": {
+    "direct_sow": ["garlic (plant cloves)", "fall radishes"],
+    "indoor_starts": [],
+    "transplant": [],
+    "harvest": ["tomatoes", "peppers", "winter squash", "apples"],
+    "tasks": ["plant garlic", "harvest before frost", "put up row covers"],
+    "highlight": "PLANT GARLIC - FROST PREP"
+  },
+  "09-08": {
+    "direct_sow": [],
+    "indoor_starts": [],
+    "transplant": [],
+    "harvest": ["tomatoes (last)", "peppers", "winter squash", "apples", "fall greens"],
+    "tasks": ["harvest tomatoes before frost", "cover tender crops", "clean beds"],
+    "highlight": "HARVEST BEFORE FROST - COVER CROPS"
+  },
+  "09-15": {
+    "direct_sow": [],
+    "indoor_starts": [],
+    "transplant": [],
+    "harvest": ["fall greens", "apples", "winter squash", "root vegetables"],
+    "tasks": ["first frost watch", "bring in tender herbs", "mulch garlic"],
+    "highlight": "FIRST FROST WATCH - BRING IN HERBS"
+  },
+  "09-22": {
+    "direct_sow": [],
+    "indoor_starts": [],
+    "transplant": [],
+    "harvest": ["fall greens", "root vegetables", "apples", "pears"],
+    "tasks": ["put garden to bed", "compost spent plants", "clean tools"],
+    "highlight": "PUT GARDEN TO BED - COMPOST & CLEAN"
+  },
+  "09-29": {
+    "direct_sow": [],
+    "indoor_starts": [],
+    "transplant": [],
+    "harvest": ["kale (after frost)", "root vegetables", "apples"],
+    "tasks": ["mulch beds for winter", "store root vegetables", "clean greenhouse"],
+    "highlight": "MULCH BEDS - STORE ROOT VEGETABLES"
+  },
+  "10-06": {
+    "direct_sow": [],
+    "indoor_starts": [],
+    "transplant": [],
+    "harvest": ["kale", "Brussels sprouts", "parsnips", "apples"],
+    "tasks": ["harvest cold-hardy crops", "final compost turn", "drain hoses"],
+    "highlight": "HARVEST KALE & BRUSSELS SPROUTS"
+  },
+  "10-13": {
+    "direct_sow": [],
+    "indoor_starts": [],
+    "transplant": [],
+    "harvest": ["kale", "Brussels sprouts", "root vegetables"],
+    "tasks": ["clean up garden", "store stakes and cages", "winterize"],
+    "highlight": "CLEAN UP GARDEN - WINTERIZE"
+  },
+  "10-20": {
+    "direct_sow": [],
+    "indoor_starts": [],
+    "transplant": [],
+    "harvest": ["kale (frost sweetened)", "parsnips", "leeks"],
+    "tasks": ["final harvest", "spread compost on beds", "put tools away"],
+    "highlight": "FINAL HARVEST - SPREAD COMPOST"
+  },
+  "10-27": {
+    "direct_sow": [],
+    "indoor_starts": [],
+    "transplant": [],
+    "harvest": ["kale", "parsnips"],
+    "tasks": ["season complete", "mulch perennials", "plan for next year"],
+    "highlight": "SEASON WRAPPING UP - PLAN FOR NEXT YEAR"
+  }
+}

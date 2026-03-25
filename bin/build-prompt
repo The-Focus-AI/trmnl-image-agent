@@ -2,12 +2,21 @@
 # Build TRMNL image prompt from parsed JSON data
 # Reads from /tmp/trmnl-data/parsed.json
 # Outputs prompt to /tmp/trmnl-prompt.txt
+#
+# Supports seasonal display modes:
+#   ski, maple, blended (data-driven, existing)
+#   spring, summer, fall (date-driven, new)
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 DATA_DIR="/tmp/trmnl-data"
 INPUT_FILE="$DATA_DIR/parsed.json"
 OUTPUT_FILE="/tmp/trmnl-prompt.txt"
+
+PLANTING_FILE="$PROJECT_DIR/prompts/planting-calendar-zone6a.json"
+SCHOOL_FILE="$PROJECT_DIR/prompts/school-calendar.json"
 
 if [ ! -f "$INPUT_FILE" ]; then
   echo "Error: Missing $INPUT_FILE - run parse-data first" >&2
@@ -50,23 +59,145 @@ MOON_PHASE=$(jq -r '.sun_moon.moon_phase // "first quarter"' "$INPUT_FILE")
 BANNER_TYPE=$(jq -r '.banner.type // "normal"' "$INPUT_FILE")
 BANNER_TEXT=$(jq -r '.banner.text // empty' "$INPUT_FILE")
 
-# Determine display mode: maple, ski, or blended
-# Mohawk closed + sap flowing = full maple mode
-# Mohawk open + sap flowing = blended (both)
-# Otherwise = ski mode
+FROST_RISK=$(jq -r '.season_indicators.frost_risk // "none"' "$INPUT_FILE")
+
+# ─── Season detection (date-based) ───
+CURRENT_MONTH=$(TZ='America/New_York' date "+%-m")
+CURRENT_DAY=$(TZ='America/New_York' date "+%-d")
+CURRENT_DATE_ISO=$(TZ='America/New_York' date "+%Y-%m-%d")
+MMDD=$(TZ='America/New_York' date "+%m-%d")
+
+# Calculate day-of-year approximation for range checks
+# Mar 16 = ~75, May 15 = ~135, Sep 15 = ~258, Nov 30 = ~334
+if [ "$CURRENT_MONTH" -ge 3 ] && [ "$CURRENT_MONTH" -le 5 ]; then
+  if [ "$CURRENT_MONTH" -eq 3 ] && [ "$CURRENT_DAY" -ge 16 ]; then
+    DATE_SEASON="spring"
+  elif [ "$CURRENT_MONTH" -eq 4 ]; then
+    DATE_SEASON="spring"
+  elif [ "$CURRENT_MONTH" -eq 5 ] && [ "$CURRENT_DAY" -le 15 ]; then
+    DATE_SEASON="spring"
+  elif [ "$CURRENT_MONTH" -eq 5 ] && [ "$CURRENT_DAY" -ge 16 ]; then
+    DATE_SEASON="summer"
+  else
+    DATE_SEASON="winter"
+  fi
+elif [ "$CURRENT_MONTH" -ge 6 ] && [ "$CURRENT_MONTH" -le 9 ]; then
+  if [ "$CURRENT_MONTH" -eq 9 ] && [ "$CURRENT_DAY" -ge 16 ]; then
+    DATE_SEASON="fall"
+  else
+    DATE_SEASON="summer"
+  fi
+elif [ "$CURRENT_MONTH" -ge 10 ] && [ "$CURRENT_MONTH" -le 11 ]; then
+  DATE_SEASON="fall"
+else
+  DATE_SEASON="winter"
+fi
+
+# ─── Display mode cascade ───
+# 1. Data-driven modes (ski/maple/blended) take priority when active
+# 2. Date-driven modes (spring/summer/fall) activate otherwise
 if [ "$MOHAWK_STATUS" = "closed" ] && [ "$SAP_FLOWING" = "true" ]; then
   DISPLAY_MODE="maple"
-elif [ "$SAP_FLOWING" = "true" ]; then
+elif [ "$MOHAWK_STATUS" = "open" ] && [ "$SAP_FLOWING" = "true" ]; then
   DISPLAY_MODE="blended"
+elif [ "$MOHAWK_STATUS" = "open" ]; then
+  DISPLAY_MODE="ski"
+elif [ "$DATE_SEASON" = "spring" ]; then
+  DISPLAY_MODE="spring"
+elif [ "$DATE_SEASON" = "summer" ]; then
+  DISPLAY_MODE="summer"
+elif [ "$DATE_SEASON" = "fall" ]; then
+  DISPLAY_MODE="fall"
 else
   DISPLAY_MODE="ski"
 fi
 
-# Build scene modifier based on conditions and display mode
+echo "Display mode: $DISPLAY_MODE (date_season=$DATE_SEASON, mohawk=$MOHAWK_STATUS, sap=$SAP_FLOWING)" >&2
+
+# ─── Planting calendar lookup ───
+PLANT_SOW=""
+PLANT_START=""
+PLANT_TRANSPLANT=""
+PLANT_HARVEST=""
+PLANT_TASK=""
+PLANT_HIGHLIGHT=""
+
+if [ -f "$PLANTING_FILE" ] && [ "$DISPLAY_MODE" = "spring" ] || [ "$DISPLAY_MODE" = "summer" ] || [ "$DISPLAY_MODE" = "fall" ]; then
+  # Find the Monday on or before today (key format: MM-DD)
+  # Try current week's Monday, then go back
+  DOW=$(TZ='America/New_York' date "+%u")  # 1=Mon, 7=Sun
+  DAYS_SINCE_MON=$((DOW - 1))
+  MONDAY_MMDD=$(TZ='America/New_York' date -v-${DAYS_SINCE_MON}d "+%m-%d")
+
+  # Look up this week in planting calendar
+  WEEK_DATA=$(jq -r --arg key "$MONDAY_MMDD" '.[$key] // empty' "$PLANTING_FILE" 2>/dev/null)
+
+  if [ -n "$WEEK_DATA" ] && [ "$WEEK_DATA" != "null" ]; then
+    PLANT_SOW=$(echo "$WEEK_DATA" | jq -r '.direct_sow | if length > 0 then join(", ") else "" end')
+    PLANT_START=$(echo "$WEEK_DATA" | jq -r '.indoor_starts | if length > 0 then join(", ") else "" end')
+    PLANT_TRANSPLANT=$(echo "$WEEK_DATA" | jq -r '.transplant | if length > 0 then join(", ") else "" end')
+    PLANT_HARVEST=$(echo "$WEEK_DATA" | jq -r '.harvest | if length > 0 then join(", ") else "" end')
+    PLANT_TASK=$(echo "$WEEK_DATA" | jq -r '.tasks[0] // ""')
+    PLANT_HIGHLIGHT=$(echo "$WEEK_DATA" | jq -r '.highlight // ""')
+    echo "Planting week: $MONDAY_MMDD - $PLANT_HIGHLIGHT" >&2
+  else
+    echo "Planting week: $MONDAY_MMDD - no data found" >&2
+  fi
+fi
+
+# ─── School calendar lookup (events within 3 days) ───
+SCHOOL_EVENT=""
+SCHOOL_EVENT_TYPE=""
+
+if [ -f "$SCHOOL_FILE" ]; then
+  # Check today and next 3 days for school events
+  for OFFSET in 0 1 2 3; do
+    CHECK_DATE=$(TZ='America/New_York' date -v+${OFFSET}d "+%Y-%m-%d")
+    EVENT=$(jq -r --arg d "$CHECK_DATE" '.events[] | select(.date == $d) | .description' "$SCHOOL_FILE" 2>/dev/null | head -1)
+    EVENT_TYPE=$(jq -r --arg d "$CHECK_DATE" '.events[] | select(.date == $d) | .type' "$SCHOOL_FILE" 2>/dev/null | head -1)
+    if [ -n "$EVENT" ] && [ "$EVENT" != "null" ]; then
+      if [ "$OFFSET" -eq 0 ]; then
+        SCHOOL_EVENT="TODAY: $EVENT"
+      elif [ "$OFFSET" -eq 1 ]; then
+        SCHOOL_EVENT="TOMORROW: $EVENT"
+      else
+        DAY_NAME=$(TZ='America/New_York' date -v+${OFFSET}d "+%a" | tr '[:lower:]' '[:upper:]')
+        SCHOOL_EVENT="$DAY_NAME: $EVENT"
+      fi
+      SCHOOL_EVENT_TYPE="$EVENT_TYPE"
+      break
+    fi
+  done
+  if [ -n "$SCHOOL_EVENT" ]; then
+    echo "School event: $SCHOOL_EVENT ($SCHOOL_EVENT_TYPE)" >&2
+  fi
+fi
+
+# ─── Build scene modifier based on display mode and sub-season ───
 if [ "$DISPLAY_MODE" = "maple" ]; then
   SCENE_MODIFIER="sugar maple trees with sap buckets and tubing lines attached to trunks, a rustic sugar house with steam rising from the cupola, stacked firewood, muddy path with patches of melting snow, bare branches with early buds starting to show, rolling Connecticut hills in background"
 elif [ "$DISPLAY_MODE" = "blended" ]; then
   SCENE_MODIFIER="split scene - left side shows ski slopes with pine trees and a skier, right side transitions to sugar maples with sap buckets hanging from trunks and a small sugar house with steam rising, patches of snow melting in the foreground"
+elif [ "$DISPLAY_MODE" = "spring" ]; then
+  if [ "$CURRENT_MONTH" -eq 3 ]; then
+    SCENE_MODIFIER="late winter landscape transitioning to spring, patches of melting snow revealing brown earth, early crocuses pushing through, garden beds being cleared, cold frames visible, a rustic tool shed with spade and rake leaning against it, rolling Litchfield Hills with bare trees beginning to bud"
+  elif [ "$CURRENT_MONTH" -eq 4 ]; then
+    SCENE_MODIFIER="early spring New England garden scene, freshly planted rows with small markers, daffodils blooming along a stone wall, cold frames with seedlings, a wheelbarrow of compost, budding trees with delicate branches, rolling Connecticut hills in background"
+  else
+    SCENE_MODIFIER="late spring garden in full preparation, transplanted tomato and pepper seedlings with cages, flowering apple and cherry trees, a garden shed with tools, stone walls with wild violets, lush green rolling Litchfield Hills"
+  fi
+elif [ "$DISPLAY_MODE" = "summer" ]; then
+  if [ "$CURRENT_MONTH" -le 7 ]; then
+    SCENE_MODIFIER="summer New England garden in full growth, tall tomato plants on stakes, bean poles with climbing vines, rows of lettuce and herbs, a rustic garden gate, sunflowers along a fence, stone walls, lush green Connecticut hills under warm sky"
+  else
+    SCENE_MODIFIER="late summer harvest scene, overflowing garden baskets, tall corn stalks, heavy tomato vines, squash sprawling, a farm stand with produce, sunflowers, covered bridge in distance, rolling green Litchfield Hills"
+  fi
+elif [ "$DISPLAY_MODE" = "fall" ]; then
+  if [ "$CURRENT_MONTH" -eq 10 ]; then
+    SCENE_MODIFIER="peak autumn New England scene, brilliant foliage on maples and oaks, pumpkins in garden, harvest baskets, apple orchard with fruit, stone walls draped in fall color, covered bridge, rolling Litchfield Hills in full autumn splendor"
+  else
+    SCENE_MODIFIER="late fall garden being put to bed, mulched beds, bare trees with last leaves falling, root vegetables being harvested, compost pile, frost-kissed kale, rolling brown Connecticut hills with bare branches"
+  fi
 elif [ "$BANNER_TYPE" = "powder_day" ]; then
   SCENE_MODIFIER="pine trees heavily laden with fresh snow, skier spraying powder while carving down a trail leaving a white powder spray behind them"
   SURFACE="POWDER"
@@ -76,7 +207,7 @@ else
   SCENE_MODIFIER="pine trees covered in snow (black line hatching for tree details, white for snow), ski lift chairs visible, and a skier carving down a groomed trail"
 fi
 
-# Build wind chill sign if significant
+# ─── Build wind chill sign if significant ───
 WIND_CHILL_SIGN=""
 if [ -n "$WIND_CHILL" ] && [ "$WIND_CHILL" != "null" ]; then
   DIFF=$((TEMP - WIND_CHILL))
@@ -85,80 +216,180 @@ if [ -n "$WIND_CHILL" ] && [ "$WIND_CHILL" != "null" ]; then
   fi
 fi
 
-# Build weather alert sign
+# ─── Build frost warning sign (spring/fall only) ───
+FROST_SIGN=""
+if [ "$FROST_RISK" = "hard_freeze" ]; then
+  FROST_SIGN="- Warning triangle sign with '⚠ HARD FREEZE ${LOW}°F TONIGHT'"
+elif [ "$FROST_RISK" = "frost" ]; then
+  FROST_SIGN="- Warning triangle sign with '⚠ FROST TONIGHT ${LOW}°F'"
+elif [ "$FROST_RISK" = "light_frost" ]; then
+  FROST_SIGN="- Warning triangle sign with '⚠ LIGHT FROST POSSIBLE'"
+fi
+
+# ─── Build weather alert sign ───
 ALERT_SIGN=""
 if [ -n "$WEATHER_ALERT" ] && [ "$WEATHER_ALERT" != "null" ]; then
   ALERT_SIGN="- Warning triangle sign with '⚠ ${WEATHER_ALERT}'"
 fi
 
-# Build bottom banner
-if [ -n "$BANNER_TEXT" ] && [ "$BANNER_TEXT" != "null" ]; then
+# ─── Build bottom banner (priority cascade) ───
+# Priority: frost warnings > school events > weather banners > planting highlights > seasonal
+if [ "$FROST_RISK" = "hard_freeze" ] || [ "$FROST_RISK" = "frost" ]; then
+  # Frost warning banner (combine with school event if present)
+  FROST_MSG="⚠ FROST TONIGHT ${LOW}°F - COVER TENDER PLANTS"
+  if [ -n "$SCHOOL_EVENT" ]; then
+    BOTTOM_BANNER="BOTTOM CENTER - Large prominent banner ribbon with '${FROST_MSG} • ${SCHOOL_EVENT}'"
+  else
+    BOTTOM_BANNER="BOTTOM CENTER - Large prominent banner ribbon with '${FROST_MSG}'"
+  fi
+elif [ -n "$SCHOOL_EVENT" ]; then
+  # School event banner (combine with planting highlight if present)
+  SCHOOL_MSG=$(echo "$SCHOOL_EVENT" | tr '[:lower:]' '[:upper:]')
+  if [ -n "$PLANT_HIGHLIGHT" ] && { [ "$DISPLAY_MODE" = "spring" ] || [ "$DISPLAY_MODE" = "summer" ] || [ "$DISPLAY_MODE" = "fall" ]; }; then
+    BOTTOM_BANNER="BOTTOM CENTER - Large prominent banner ribbon with '${SCHOOL_MSG} • ${PLANT_HIGHLIGHT}'"
+  else
+    BOTTOM_BANNER="BOTTOM CENTER - Large prominent banner ribbon with '${SCHOOL_MSG}'"
+  fi
+elif [ -n "$BANNER_TEXT" ] && [ "$BANNER_TEXT" != "null" ]; then
   BOTTOM_BANNER="BOTTOM CENTER - Large prominent banner ribbon with '${BANNER_TEXT}'"
+elif [ -n "$PLANT_HIGHLIGHT" ] && { [ "$DISPLAY_MODE" = "spring" ] || [ "$DISPLAY_MODE" = "summer" ] || [ "$DISPLAY_MODE" = "fall" ]; }; then
+  BOTTOM_BANNER="BOTTOM CENTER - Banner ribbon with '🌱 ${PLANT_HIGHLIGHT}'"
+elif [ "$DISPLAY_MODE" = "spring" ]; then
+  BOTTOM_BANNER="BOTTOM CENTER - Decorative border with spring wildflowers and budding branches"
+elif [ "$DISPLAY_MODE" = "summer" ]; then
+  BOTTOM_BANNER="BOTTOM CENTER - Decorative border with garden vegetables and sunflowers"
+elif [ "$DISPLAY_MODE" = "fall" ]; then
+  BOTTOM_BANNER="BOTTOM CENTER - Decorative border with fall leaves and harvest pumpkins"
 else
   BOTTOM_BANNER="BOTTOM CENTER - Decorative pine branch border with small snowflakes"
 fi
 
-# Generate the prompt
+# ─── Build the info board (right side) ───
+# Spring/summer/fall: planting board. Winter modes: ski/maple board.
+build_info_board() {
+  if [ "$DISPLAY_MODE" = "spring" ] || [ "$DISPLAY_MODE" = "summer" ] || [ "$DISPLAY_MODE" = "fall" ]; then
+    # Planting / garden board
+    echo "BOTTOM RIGHT - Rustic wooden garden board showing:"
+    echo "- 'PLANT THIS WEEK' as header"
+    if [ -n "$PLANT_SOW" ]; then
+      echo "- 'SOW: ${PLANT_SOW}'"
+    fi
+    if [ -n "$PLANT_START" ]; then
+      echo "- 'START: ${PLANT_START}'"
+    fi
+    if [ -n "$PLANT_TRANSPLANT" ]; then
+      echo "- 'TRANSPLANT: ${PLANT_TRANSPLANT}'"
+    fi
+    if [ -n "$PLANT_HARVEST" ]; then
+      echo "- 'HARVEST: ${PLANT_HARVEST}'"
+    fi
+    if [ -n "$PLANT_TASK" ]; then
+      echo "- 'TASK: ${PLANT_TASK}'"
+    fi
+    # Fallback if no planting data
+    if [ -z "$PLANT_SOW" ] && [ -z "$PLANT_START" ] && [ -z "$PLANT_TRANSPLANT" ] && [ -z "$PLANT_HARVEST" ] && [ -z "$PLANT_TASK" ]; then
+      echo "- 'Season winding down'"
+      echo "- 'Check back next week'"
+    fi
+  elif [ "$DISPLAY_MODE" = "maple" ]; then
+    echo "BOTTOM RIGHT - Rustic wooden maple season board showing:"
+    echo "- 'MAPLE SEASON' as header"
+    echo "- 'SAP: FLOWING' in bold"
+    echo "- 'QUALITY: ${MAPLE_QUALITY}'"
+    echo "- 'HIGH ${HIGH}°F / LOW ${LOW}°F'"
+  elif [ "$DISPLAY_MODE" = "blended" ]; then
+    echo "BOTTOM RIGHT - Two small wooden boards stacked:"
+    echo "Top board - 'MOHAWK MTN':"
+    echo "- '${TRAILS_OPEN}/${TRAILS_TOTAL} TRAILS • ${SURFACE}'"
+    echo "Bottom board - 'MAPLE SEASON':"
+    echo "- 'SAP: FLOWING • ${MAPLE_QUALITY}'"
+  else
+    echo "BOTTOM RIGHT - Wooden ski conditions board showing:"
+    echo "- 'MOHAWK MTN' as header"
+    echo "- '${TRAILS_OPEN}/${TRAILS_TOTAL} TRAILS'"
+    echo "- '${BASE_DEPTH}\" BASE'"
+    echo "- '${SURFACE}'"
+  fi
+}
+
+# ─── Build scene description ───
+build_scene() {
+  if [ "$DISPLAY_MODE" = "maple" ]; then
+    echo "SCENE: Late winter New England landscape transitioning to spring, ${SCENE_MODIFIER}. Rolling hills of the Litchfield Hills in background with black hatching."
+  elif [ "$DISPLAY_MODE" = "blended" ]; then
+    echo "SCENE: New England landscape in late ski season transitioning to maple season, ${SCENE_MODIFIER}. Rolling hills of the Berkshires/Litchfield Hills in background with black hatching."
+  elif [ "$DISPLAY_MODE" = "spring" ]; then
+    echo "SCENE: Spring New England countryside, ${SCENE_MODIFIER}. White sky with black hatching for depth."
+  elif [ "$DISPLAY_MODE" = "summer" ]; then
+    echo "SCENE: Summer New England countryside, ${SCENE_MODIFIER}. White sky with light hatching."
+  elif [ "$DISPLAY_MODE" = "fall" ]; then
+    echo "SCENE: Autumn New England countryside, ${SCENE_MODIFIER}. White sky with cross-hatching for depth."
+  else
+    echo "SCENE: Snowy New England ski mountain landscape with ski slopes, ${SCENE_MODIFIER}. Rocky outcrops and rolling hills of the Berkshires in background with black hatching."
+  fi
+}
+
+# ─── Build style line ───
+build_style() {
+  echo -n "Style: 1-bit black and white line drawing. Use ONLY pure black and pure white - no gray tones. All shading with hatching/cross-hatching. Woodcut/linocut etching aesthetic. Crisp black text on white. "
+  if [ "$DISPLAY_MODE" = "maple" ]; then
+    echo "Vintage New England sugar house poster style."
+  elif [ "$DISPLAY_MODE" = "blended" ]; then
+    echo "Vintage New England seasonal poster style."
+  elif [ "$DISPLAY_MODE" = "spring" ]; then
+    echo "Vintage New England garden almanac style."
+  elif [ "$DISPLAY_MODE" = "summer" ]; then
+    echo "Vintage botanical illustration style."
+  elif [ "$DISPLAY_MODE" = "fall" ]; then
+    echo "Vintage harvest poster style."
+  else
+    echo "Vintage ski poster style."
+  fi
+}
+
+# ─── Choose alert/frost sign for left signpost ───
+# In spring/fall, frost sign takes precedence over generic weather alert
+LEFT_WARNING=""
+if [ "$DISPLAY_MODE" = "spring" ] || [ "$DISPLAY_MODE" = "fall" ]; then
+  if [ -n "$FROST_SIGN" ]; then
+    LEFT_WARNING="$FROST_SIGN"
+  elif [ -n "$ALERT_SIGN" ]; then
+    LEFT_WARNING="$ALERT_SIGN"
+  fi
+else
+  LEFT_WARNING="$ALERT_SIGN"
+fi
+
+# Build the extra signpost lines (only if they have content)
+EXTRA_SIGNS=""
+[ -n "$WIND_CHILL_SIGN" ] && EXTRA_SIGNS="${EXTRA_SIGNS}
+${WIND_CHILL_SIGN}"
+[ -n "$LEFT_WARNING" ] && EXTRA_SIGNS="${EXTRA_SIGNS}
+${LEFT_WARNING}"
+
+# ─── Generate the prompt ───
 cat > "$OUTPUT_FILE" << EOF
 Black and white 1-bit line drawing in woodcut/linocut etching style for e-ink display. Wide 16:9 landscape format. Use ONLY pure black and pure white - no grays.
 
-$(if [ "$DISPLAY_MODE" = "maple" ]; then
-echo "SCENE: Late winter New England landscape transitioning to spring, ${SCENE_MODIFIER}. Rolling hills of the Litchfield Hills in background with black hatching."
-elif [ "$DISPLAY_MODE" = "blended" ]; then
-echo "SCENE: New England landscape in late ski season transitioning to maple season, ${SCENE_MODIFIER}. Rolling hills of the Berkshires/Litchfield Hills in background with black hatching."
-else
-echo "SCENE: Snowy New England ski mountain landscape with ski slopes, ${SCENE_MODIFIER}. Rocky outcrops and rolling hills of the Berkshires in background with black hatching."
-fi)
+$(build_scene)
 
 LEFT SIDE - Rustic wooden signpost with multiple signs showing:
 - '${DATE}' (top sign, arrow style pointing right)
 - '${TEMP}°F ${CONDITIONS}' (middle sign)
-- 'HIGH ${HIGH}°F / LOW ${LOW}°F' (next sign)
-${WIND_CHILL_SIGN}
-${ALERT_SIGN}
+- 'HIGH ${HIGH}°F / LOW ${LOW}°F' (next sign)${EXTRA_SIGNS}
 
 TOP RIGHT - Three framed icons in decorative vintage borders:
 - Sunrise icon with '${SUNRISE}'
 - Moon phase icon showing ${MOON_PHASE} moon
 - Sunset icon with '${SUNSET}'
 
-$(if [ "$DISPLAY_MODE" = "maple" ]; then
-cat << BOARD
-BOTTOM RIGHT - Rustic wooden maple season board showing:
-- 'MAPLE SEASON' as header
-- 'SAP: FLOWING' in bold
-- 'QUALITY: ${MAPLE_QUALITY}'
-- 'HIGH ${HIGH}°F / LOW ${LOW}°F'
-BOARD
-elif [ "$DISPLAY_MODE" = "blended" ]; then
-cat << BOARD
-BOTTOM RIGHT - Two small wooden boards stacked:
-Top board - 'MOHAWK MTN':
-- '${TRAILS_OPEN}/${TRAILS_TOTAL} TRAILS • ${SURFACE}'
-Bottom board - 'MAPLE SEASON':
-- 'SAP: FLOWING • ${MAPLE_QUALITY}'
-BOARD
-else
-cat << BOARD
-BOTTOM RIGHT - Wooden ski conditions board showing:
-- 'MOHAWK MTN' as header
-- '${TRAILS_OPEN}/${TRAILS_TOTAL} TRAILS'
-- '${BASE_DEPTH}" BASE'
-- '${SURFACE}'
-BOARD
-fi)
+$(build_info_board)
 
 ${BOTTOM_BANNER}
 
 BOTTOM LEFT CORNER - Small text in a simple frame reading 'Updated ${TIMESTAMP}'
 
-$(if [ "$DISPLAY_MODE" = "maple" ]; then
-echo "Style: 1-bit black and white line drawing. Use ONLY pure black and pure white - no gray tones. All shading with hatching/cross-hatching. Woodcut/linocut etching aesthetic. Crisp black text on white. Vintage New England sugar house poster style."
-elif [ "$DISPLAY_MODE" = "blended" ]; then
-echo "Style: 1-bit black and white line drawing. Use ONLY pure black and pure white - no gray tones. All shading with hatching/cross-hatching. Woodcut/linocut etching aesthetic. Crisp black text on white. Vintage New England seasonal poster style."
-else
-echo "Style: 1-bit black and white line drawing. Use ONLY pure black and pure white - no gray tones. All shading with hatching/cross-hatching. Woodcut/linocut etching aesthetic. Crisp black text on white. Vintage ski poster style."
-fi)
+$(build_style)
 EOF
 
 echo "Prompt written to $OUTPUT_FILE" >&2

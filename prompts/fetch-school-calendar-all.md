@@ -37,7 +37,7 @@ Fetch upcoming school schedule changes for local schools in the Cornwall/Litchfi
 
 ## School Year
 - **First Day:** September 2, 2025
-- **Last Day:** June 12, 2026 (early dismissal)
+- **Last Day:** June 19, 2026 (early dismissal) — updated 3/17/26 with 6 snow days
 
 ## All Days Off & Schedule Changes
 
@@ -65,6 +65,7 @@ Fetch upcoming school schedule changes for local schools in the Cornwall/Litchfi
 #### December 2025
 | Date | Day | Type | Description |
 |------|-----|------|-------------|
+| Dec 2 | Tue | NO SCHOOL | Snow Day - Closed (blue) |
 | Dec 10 | Wed | EARLY DISMISSAL | Regional PD (yellow) |
 | Dec 22-31 | Mon-Wed | NO SCHOOL | Holiday Recess (blue) |
 
@@ -78,7 +79,8 @@ Fetch upcoming school schedule changes for local schools in the Cornwall/Litchfi
 #### February 2026
 | Date | Day | Type | Description |
 |------|-----|------|-------------|
-| Feb 16-18 | Mon-Wed | NO SCHOOL | February Break (blue) |
+| Feb 16-17 | Mon-Tue | NO SCHOOL | February Break (blue) |
+| Feb 18 | Wed | EARLY DISMISSAL | Regional PD (yellow) |
 
 #### March 2026
 | Date | Day | Type | Description |
@@ -96,14 +98,14 @@ Fetch upcoming school schedule changes for local schools in the Cornwall/Litchfi
 #### May 2026
 | Date | Day | Type | Description |
 |------|-----|------|-------------|
-| May 22 | Fri | NO SCHOOL | No School (blue) |
 | May 25 | Mon | NO SCHOOL | Memorial Day (blue) |
 
 #### June 2026
 | Date | Day | Type | Description |
 |------|-----|------|-------------|
-| Jun 11 | Thu | EARLY DISMISSAL | Regional PD (yellow) |
-| Jun 12 | Fri | EARLY DISMISSAL | Last Day of School (green) |
+| Jun 5 | Fri | EARLY DISMISSAL | HVRHS Early Dismissal (9-12 only) |
+| Jun 18 | Thu | EARLY DISMISSAL | Early Dismissal |
+| Jun 19 | Fri | EARLY DISMISSAL | Last Day of School / Juneteenth (green) |
 
 ---
 

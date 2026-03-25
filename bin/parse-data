@@ -185,4 +185,51 @@ fi
 
 echo "Maple override: sap_flowing=$SAP_FLOWING quality=$MAPLE_QUALITY (high=$HIGH low=$LOW)" >&2
 
+# Determine if Mohawk is closed for the season (off-season placeholder text)
+MOHAWK_TEXT=$(jq -r '.mohawk.status // "open"' "$OUTPUT_FILE")
+if grep -q "closed for the season" "$DATA_DIR/mohawk.txt" 2>/dev/null; then
+  jq '.mohawk.status = "closed_season"' "$OUTPUT_FILE" > "${OUTPUT_FILE}.tmp" \
+    && mv "${OUTPUT_FILE}.tmp" "$OUTPUT_FILE"
+fi
+
+# Add season_indicators: frost_risk and growing_conditions
+# Frost risk: if tonight's low <= 32°F during growing season (Apr-Oct)
+CURRENT_MONTH=$(TZ='America/New_York' date "+%-m")
+FROST_RISK="none"
+if [ "$CURRENT_MONTH" -ge 3 ] && [ "$CURRENT_MONTH" -le 5 ]; then
+  if [ "$LOW" -le 28 ] 2>/dev/null; then
+    FROST_RISK="hard_freeze"
+  elif [ "$LOW" -le 32 ] 2>/dev/null; then
+    FROST_RISK="frost"
+  elif [ "$LOW" -le 36 ] 2>/dev/null; then
+    FROST_RISK="light_frost"
+  fi
+elif [ "$CURRENT_MONTH" -ge 9 ] && [ "$CURRENT_MONTH" -le 10 ]; then
+  if [ "$LOW" -le 28 ] 2>/dev/null; then
+    FROST_RISK="hard_freeze"
+  elif [ "$LOW" -le 32 ] 2>/dev/null; then
+    FROST_RISK="frost"
+  elif [ "$LOW" -le 36 ] 2>/dev/null; then
+    FROST_RISK="light_frost"
+  fi
+fi
+
+# Growing conditions based on temperature range
+GROWING_CONDITIONS="dormant"
+if [ "$HIGH" -ge 60 ] 2>/dev/null && [ "$LOW" -ge 40 ] 2>/dev/null; then
+  GROWING_CONDITIONS="ideal"
+elif [ "$HIGH" -ge 50 ] 2>/dev/null && [ "$LOW" -ge 32 ] 2>/dev/null; then
+  GROWING_CONDITIONS="good"
+elif [ "$HIGH" -ge 40 ] 2>/dev/null; then
+  GROWING_CONDITIONS="cool"
+fi
+
+# Patch season_indicators into JSON
+jq --arg frost "$FROST_RISK" --arg growing "$GROWING_CONDITIONS" \
+  '.season_indicators = {"frost_risk": $frost, "growing_conditions": $growing}' \
+  "$OUTPUT_FILE" > "${OUTPUT_FILE}.tmp" \
+  && mv "${OUTPUT_FILE}.tmp" "$OUTPUT_FILE"
+
+echo "Season indicators: frost_risk=$FROST_RISK growing=$GROWING_CONDITIONS" >&2
+
 echo "$OUTPUT_FILE"

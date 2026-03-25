@@ -1,5 +1,4 @@
 #!/bin/bash
-
 # Run script for TRMNL Image Agent
 # Generates image, copies to latest.png, commits and pushes
 # GitHub Pages serves latest.png for TRMNL Image Display plugin

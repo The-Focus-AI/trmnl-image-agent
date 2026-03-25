@@ -11,12 +11,25 @@ mkdir -p "$OUTPUT_DIR"
 
 echo "Fetching raw data in parallel..." >&2
 
+# Determine if Mohawk is in season (December through March)
+CURRENT_MONTH=$(TZ='America/New_York' date "+%-m")
+if [ "$CURRENT_MONTH" -ge 4 ] && [ "$CURRENT_MONTH" -le 11 ]; then
+  MOHAWK_OFF_SEASON=true
+else
+  MOHAWK_OFF_SEASON=false
+fi
+
 # Run fetchers in parallel
 "$SCRIPT_DIR/fetch-weather-raw" > /dev/null &
 PID_WEATHER=$!
 
-"$SCRIPT_DIR/fetch-mohawk-raw" > /dev/null &
-PID_MOHAWK=$!
+if [ "$MOHAWK_OFF_SEASON" = "true" ]; then
+  echo "Mohawk off-season (month $CURRENT_MONTH) - skipping fetch" >&2
+  echo "Mohawk Mountain is closed for the season. The ski area typically operates December through March." > "$OUTPUT_DIR/mohawk.txt"
+else
+  "$SCRIPT_DIR/fetch-mohawk-raw" > /dev/null &
+  PID_MOHAWK=$!
+fi
 
 # Sun/moon is calculated, not fetched - keep the simple script
 "$SCRIPT_DIR/fetch-sun-moon" > "$OUTPUT_DIR/sun-moon.json" &
@@ -24,12 +37,14 @@ PID_SUN=$!
 
 # Wait for all to complete
 wait $PID_WEATHER
-wait $PID_MOHAWK
+if [ "$MOHAWK_OFF_SEASON" = "false" ]; then
+  wait $PID_MOHAWK
+fi
 wait $PID_SUN
 
 echo "Raw data fetched:" >&2
 echo "  - $OUTPUT_DIR/weather.html" >&2
-echo "  - $OUTPUT_DIR/mohawk.txt" >&2
+echo "  - $OUTPUT_DIR/mohawk.txt$([ "$MOHAWK_OFF_SEASON" = "true" ] && echo " (off-season placeholder)")" >&2
 echo "  - $OUTPUT_DIR/sun-moon.json" >&2
 
 echo "$OUTPUT_DIR"

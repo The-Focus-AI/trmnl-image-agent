@@ -69,25 +69,31 @@ Configuration for rotating TRMNL dashboard content throughout the year.
 
 ### Mar 16-31: Spring Equinox / Conference Time
 **Theme:** Spring awakening, school conferences
-**Data Sources:** Weather, hiking trail conditions, school calendar
+**Display Mode:** `spring` (auto-detected from date)
+**Data Sources:** Weather, planting calendar (Zone 6a), school calendar
+**Planting Calendar:** Start tomatoes indoors, lettuce & kale indoors, sow peas if soil thawed
 **Banner Ideas:**
 - `SPRING EQUINOX` (around Mar 20)
 - `EARLY DISMISSAL - CONFERENCES` (Mar 24-26)
+- `🌱 START TOMATOES INDOORS`
 **School Note:** Mar 24 HS conferences, Mar 25-26 Elementary conferences
-**Imagery:** First flowers, melting snow, birds returning
+**Imagery:** First flowers, melting snow, garden prep, cold frames
 
 ---
 
 ## April
 
 ### Apr 1-12: Early Spring / Pre-Break
-**Theme:** Spring hiking, mud season
-**Data Sources:** Weather, trail conditions, school calendar
+**Theme:** Spring planting, mud season
+**Display Mode:** `spring`
+**Data Sources:** Weather, planting calendar (Zone 6a), school calendar
+**Planting Calendar:** Sow cool-season crops (peas, spinach, radishes, lettuce), plant potatoes & onion sets
 **Banner Ideas:**
 - `GOOD FRIDAY - NO SCHOOL` (Apr 3)
 - `SPRING BREAK STARTS MON` (Apr 13)
+- `🌱 SOW COOL-SEASON CROPS OUTDOORS`
 **School Note:** Apr 3 Good Friday, Apr 8 Early dismissal, Apr 13-17 Spring Recess
-**Imagery:** Wildflowers, streams, trail markers
+**Imagery:** Planted rows, daffodils, cold frames, garden prep
 
 ### Apr 13-17: Spring Recess
 **Theme:** Spring break, outdoor adventures
@@ -99,32 +105,40 @@ Configuration for rotating TRMNL dashboard content throughout the year.
 
 ### Apr 18-30: Earth Day / Late April
 **Theme:** Earth Day, planting season
-**Data Sources:** Weather, garden planting dates
+**Display Mode:** `spring`
+**Data Sources:** Weather, planting calendar (Zone 6a)
+**Planting Calendar:** Transplant broccoli & cabbage, sow lettuce/arugula, harvest early spinach & radishes
 **Banner Ideas:**
 - `EARTH DAY` (Apr 22)
 - `ARBOR DAY` (last Friday)
-**Imagery:** Gardens, seedlings, Housatonic River
+- `🌱 TRANSPLANT BROCCOLI & CABBAGE`
+**Imagery:** Gardens, seedlings, transplanting, flowering trees
 
 ---
 
 ## May
 
 ### May 1-15: Mother's Day / Spring Bloom
-**Theme:** Flowers, fishing, outdoor activities
-**Data Sources:** Weather, Housatonic fishing conditions
+**Theme:** Flowers, planting warm-season crops
+**Display Mode:** `spring`
+**Data Sources:** Weather, planting calendar (Zone 6a)
+**Planting Calendar:** Sow beans & corn, watch frost dates, prepare for transplanting tomatoes after May 15
 **Banner Ideas:**
 - `HAPPY MOTHER'S DAY` (2nd Sunday)
-- `TROUT SEASON OPEN`
-**Imagery:** Wildflowers, fishing, covered bridges
+- `🌱 SOW BEANS & CORN - WATCH FROST DATES`
+**Imagery:** Garden growth, flowering trees, transplant prep
 
 ### May 16-31: Memorial Day / Late Spring
-**Theme:** Memorial Day, early summer
-**Data Sources:** Weather, local events, school calendar
+**Theme:** Memorial Day, transplanting season
+**Display Mode:** `summer` (starts May 16)
+**Data Sources:** Weather, planting calendar (Zone 6a), school calendar
+**Planting Calendar:** TRANSPLANT TOMATOES & PEPPERS! Sow squash, cucumbers, mulch, set up irrigation
 **Banner Ideas:**
 - `MEMORIAL DAY WEEKEND`
 - `NO SCHOOL MON` (May 25)
+- `🌱 TRANSPLANT TOMATOES & PEPPERS!`
 **School Note:** May 22 Early dismissal, May 25 Memorial Day
-**Imagery:** Flags, parades, picnics, opening of swimming spots
+**Imagery:** Garden transplanting, tomato cages, lush growth
 
 ---
 
@@ -148,12 +162,14 @@ Configuration for rotating TRMNL dashboard content throughout the year.
 **Imagery:** Long shadows, sunset over hills, swimming holes
 
 ### Jun 22-30: Early Summer
-**Theme:** Summer activities, outdoor living
-**Data Sources:** Weather, events, swimming spots
+**Theme:** Summer activities, garden production
+**Display Mode:** `summer`
+**Data Sources:** Weather, planting calendar (Zone 6a)
+**Planting Calendar:** First zucchini harvest, start fall brassicas indoors, pick daily
 **Banner Ideas:**
 - Farmers market schedules
-- Swimming conditions
-**Imagery:** Farms, gardens, kayaking on Housatonic
+- `🌱 FIRST ZUCCHINI - START FALL BRASSICAS`
+**Imagery:** Garden in production, zucchini, bean poles, sunflowers
 
 ---
 
@@ -168,24 +184,28 @@ Configuration for rotating TRMNL dashboard content throughout the year.
 **Imagery:** Fireworks, flags, parades, picnics (in woodcut style)
 
 ### Jul 8-31: Peak Summer
-**Theme:** Summer in full swing
-**Data Sources:** Weather, farmers markets, swimming spots
+**Theme:** Peak harvest season
+**Display Mode:** `summer`
+**Data Sources:** Weather, planting calendar (Zone 6a)
+**Planting Calendar:** Sow fall carrots/beets, peak tomato season, transplant fall broccoli, harvest daily
 **Banner Ideas:**
-- Farmers market schedules
-- `PERFECT SWIMMING WEATHER`
-**Imagery:** Swimming, hiking, farms, covered bridges, summer scenes
+- `🌱 PEAK TOMATO SEASON - HARVEST DAILY`
+- `🌱 SOW FALL CARROTS & BEETS`
+**Imagery:** Tomato-laden plants, harvest baskets, corn, sunflowers
 
 ---
 
 ## August
 
 ### Aug 1-15: Dog Days / Fair Prep
-**Theme:** Late summer, county fair season
-**Data Sources:** Weather, Cornwall Fair info
+**Theme:** Late summer harvest, preserving
+**Display Mode:** `summer`
+**Data Sources:** Weather, planting calendar (Zone 6a), Cornwall Fair info
+**Planting Calendar:** Peak harvest, preserve tomatoes, dig potatoes, plant cover crops, sow fall greens
 **Banner Ideas:**
 - `CORNWALL FAIR AUG XX-XX` (check dates)
-- Summer activities
-**Imagery:** County fair scenes, harvest beginning, late summer gardens
+- `🌱 PEAK HARVEST - PRESERVE & SOW FALL GREENS`
+**Imagery:** Overflowing harvest baskets, farm stand, county fair
 
 ### Aug 16-31: Back to School Prep
 **Theme:** End of summer, back to school
@@ -210,12 +230,14 @@ Configuration for rotating TRMNL dashboard content throughout the year.
 **Imagery:** School buses, fall colors starting, apple orchards
 
 ### Sep 8-30: Early Fall
-**Theme:** Apple season, early foliage
-**Data Sources:** Weather, apple picking, hiking
+**Theme:** Apple season, harvest, first frost watch
+**Display Mode:** `fall` (starts Sep 16)
+**Data Sources:** Weather, planting calendar (Zone 6a)
+**Planting Calendar:** Harvest before frost, cover tender crops, plant garlic, first frost watch
 **Banner Ideas:**
 - `APPLE PICKING SEASON`
-- Early foliage reports
-**Imagery:** Apple orchards, early fall colors, hiking trails
+- `🌱 FIRST FROST WATCH - BRING IN HERBS`
+**Imagery:** Apple orchards, harvest scenes, frost-kissed garden
 
 ---
 
@@ -239,12 +261,15 @@ Configuration for rotating TRMNL dashboard content throughout the year.
 **Imagery:** Pumpkins, harvest, fall hiking
 
 ### Oct 24-31: Halloween
-**Theme:** Halloween, late fall
-**Data Sources:** Weather, hunting season
+**Theme:** Halloween, garden wrap-up
+**Display Mode:** `fall`
+**Data Sources:** Weather, planting calendar (Zone 6a)
+**Planting Calendar:** Final harvest, spread compost, season wrapping up, plan for next year
 **Banner Ideas:**
 - `HAPPY HALLOWEEN`
 - `HUNTING SEASON - WEAR ORANGE`
-**Imagery:** Jack-o-lanterns, bare trees, spooky (but tasteful) scenes
+- `🌱 SEASON WRAPPING UP - PLAN FOR NEXT YEAR`
+**Imagery:** Jack-o-lanterns, bare trees, garden being put to bed
 
 ---
 
