@@ -32,11 +32,14 @@ fi
 DATE=$(jq -r '.date // "MON 26 JAN"' "$INPUT_FILE")
 TIMESTAMP=$(jq -r '.timestamp // "12:00 PM"' "$INPUT_FILE")
 
-TEMP=$(jq -r '.weather.temperature // 30' "$INPUT_FILE")
-CONDITIONS=$(jq -r '.weather.conditions // "FAIR"' "$INPUT_FILE")
-WIND_CHILL=$(jq -r '.weather.wind_chill // empty' "$INPUT_FILE")
 HIGH=$(jq -r '.weather.high // 32' "$INPUT_FILE")
 LOW=$(jq -r '.weather.low // 20' "$INPUT_FILE")
+TEMP=$(jq -r ".weather.temperature // $HIGH" "$INPUT_FILE")
+if [ "$TEMP" = "null" ]; then
+  TEMP=$HIGH
+fi
+CONDITIONS=$(jq -r '.weather.conditions // "FAIR"' "$INPUT_FILE")
+WIND_CHILL=$(jq -r '.weather.wind_chill // empty' "$INPUT_FILE")
 
 WEATHER_ALERT=$(jq -r '.alerts.weather_alert // empty' "$INPUT_FILE")
 MOUNTAIN_ALERT=$(jq -r '.alerts.mountain_alert // empty' "$INPUT_FILE")
@@ -127,7 +130,7 @@ if [ -f "$PLANTING_FILE" ] && [ "$DISPLAY_MODE" = "spring" ] || [ "$DISPLAY_MODE
   # Try current week's Monday, then go back
   DOW=$(TZ='America/New_York' date "+%u")  # 1=Mon, 7=Sun
   DAYS_SINCE_MON=$((DOW - 1))
-  MONDAY_MMDD=$(TZ='America/New_York' date -v-${DAYS_SINCE_MON}d "+%m-%d")
+  if date --version >/dev/null 2>&1; then MONDAY_MMDD=$(TZ='America/New_York' date -d "-${DAYS_SINCE_MON} days" "+%m-%d"); else MONDAY_MMDD=$(TZ='America/New_York' date -v-${DAYS_SINCE_MON}d "+%m-%d"); fi
 
   # Look up this week in planting calendar
   WEEK_DATA=$(jq -r --arg key "$MONDAY_MMDD" '.[$key] // empty' "$PLANTING_FILE" 2>/dev/null)
@@ -152,7 +155,7 @@ SCHOOL_EVENT_TYPE=""
 if [ -f "$SCHOOL_FILE" ]; then
   # Check today and next 3 days for school events
   for OFFSET in 0 1 2 3; do
-    CHECK_DATE=$(TZ='America/New_York' date -v+${OFFSET}d "+%Y-%m-%d")
+    if date --version >/dev/null 2>&1; then CHECK_DATE=$(TZ='America/New_York' date -d "+${OFFSET} days" "+%Y-%m-%d"); else CHECK_DATE=$(TZ='America/New_York' date -v+${OFFSET}d "+%Y-%m-%d"); fi
     EVENT=$(jq -r --arg d "$CHECK_DATE" '.events[] | select(.date == $d) | .description' "$SCHOOL_FILE" 2>/dev/null | head -1)
     EVENT_TYPE=$(jq -r --arg d "$CHECK_DATE" '.events[] | select(.date == $d) | .type' "$SCHOOL_FILE" 2>/dev/null | head -1)
     if [ -n "$EVENT" ] && [ "$EVENT" != "null" ]; then
@@ -161,7 +164,7 @@ if [ -f "$SCHOOL_FILE" ]; then
       elif [ "$OFFSET" -eq 1 ]; then
         SCHOOL_EVENT="TOMORROW: $EVENT"
       else
-        DAY_NAME=$(TZ='America/New_York' date -v+${OFFSET}d "+%a" | tr '[:lower:]' '[:upper:]')
+        if date --version >/dev/null 2>&1; then DAY_NAME=$(TZ='America/New_York' date -d "+${OFFSET} days" "+%a" | tr '[:lower:]' '[:upper:]'); else DAY_NAME=$(TZ='America/New_York' date -v+${OFFSET}d "+%a" | tr '[:lower:]' '[:upper:]'); fi
         SCHOOL_EVENT="$DAY_NAME: $EVENT"
       fi
       SCHOOL_EVENT_TYPE="$EVENT_TYPE"
