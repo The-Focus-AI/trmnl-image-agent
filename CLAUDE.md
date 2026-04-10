@@ -32,13 +32,16 @@ The dashboard automatically selects a display mode:
 | 1 | Mohawk open + sap flowing | `blended` | Ski + Maple |
 | 2 | Mohawk closed + sap flowing | `maple` | Maple season |
 | 3 | Mohawk open | `ski` | Ski conditions |
-| 4 | Mar 16 - May 15 | `spring` | Plant This Week |
-| 5 | May 16 - Sep 15 | `summer` | Plant This Week |
-| 6 | Sep 16 - Nov 30 | `fall` | Plant This Week |
+| 4 | Mar 16 - May 15 | `spring` | Plant This Week + Pollen |
+| 5 | May 16 - Sep 15 | `summer` | Plant This Week + Pollen |
+| 6 | Sep 16 - Nov 30 | `fall` | Plant This Week + Pollen |
 | 7 | Default | `ski` | Ski conditions |
 
 ### Planting Calendar
 Static data in `prompts/planting-calendar-zone6a.json` — week-by-week Zone 6a planting guide (Mar-Oct). Used by `bin/build-prompt` for the "PLANT THIS WEEK" info board.
+
+### Pollen Calendar
+Static data in `prompts/pollen-calendar-zone6a.json` — week-by-week Zone 6a typical pollen levels (Mar-Oct). Tracks tree, grass, and weed pollen with levels: none, low, moderate, high, very_high. Shows on the garden info board during spring/summer/fall modes when any pollen type is active.
 
 ### School Calendar
 Static data in `prompts/school-calendar.json` — Region 1 school events. Used by `bin/build-prompt` to show upcoming school events (within 3 days) in the banner.

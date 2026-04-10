@@ -16,6 +16,7 @@ INPUT_FILE="$DATA_DIR/parsed.json"
 OUTPUT_FILE="/tmp/trmnl-prompt.txt"
 
 PLANTING_FILE="$PROJECT_DIR/prompts/planting-calendar-zone6a.json"
+POLLEN_FILE="$PROJECT_DIR/prompts/pollen-calendar-zone6a.json"
 SCHOOL_FILE="$PROJECT_DIR/prompts/school-calendar.json"
 
 if [ ! -f "$INPUT_FILE" ]; then
@@ -145,6 +146,88 @@ if [ -f "$PLANTING_FILE" ] && [ "$DISPLAY_MODE" = "spring" ] || [ "$DISPLAY_MODE
     echo "Planting week: $MONDAY_MMDD - $PLANT_HIGHLIGHT" >&2
   else
     echo "Planting week: $MONDAY_MMDD - no data found" >&2
+  fi
+fi
+
+# ─── Pollen calendar lookup ───
+POLLEN_TREE=""
+POLLEN_GRASS=""
+POLLEN_WEED=""
+POLLEN_DOMINANT=""
+POLLEN_SUMMARY=""
+
+if [ -f "$POLLEN_FILE" ] && { [ "$DISPLAY_MODE" = "spring" ] || [ "$DISPLAY_MODE" = "summer" ] || [ "$DISPLAY_MODE" = "fall" ]; }; then
+  # Reuse the same Monday calculation from planting calendar
+  if [ -z "$MONDAY_MMDD" ]; then
+    DOW=$(TZ='America/New_York' date "+%u")
+    DAYS_SINCE_MON=$((DOW - 1))
+    MONDAY_MMDD=$(TZ='America/New_York' date -v-${DAYS_SINCE_MON}d "+%m-%d")
+  fi
+
+  POLLEN_DATA=$(jq -r --arg key "$MONDAY_MMDD" '.[$key] // empty' "$POLLEN_FILE" 2>/dev/null)
+
+  if [ -n "$POLLEN_DATA" ] && [ "$POLLEN_DATA" != "null" ]; then
+    POLLEN_TREE=$(echo "$POLLEN_DATA" | jq -r '.tree // "none"')
+    POLLEN_GRASS=$(echo "$POLLEN_DATA" | jq -r '.grass // "none"')
+    POLLEN_WEED=$(echo "$POLLEN_DATA" | jq -r '.weed // "none"')
+    POLLEN_DOMINANT=$(echo "$POLLEN_DATA" | jq -r '.dominant | if length > 0 then join(", ") else "" end')
+    POLLEN_SUMMARY=$(echo "$POLLEN_DATA" | jq -r '.summary // ""')
+    echo "Pollen week: $MONDAY_MMDD (raw) - Tree:$POLLEN_TREE Grass:$POLLEN_GRASS Weed:$POLLEN_WEED ($POLLEN_SUMMARY)" >&2
+
+    # ─── Weather-based pollen adjustment ───
+    # Rain knocks pollen down, warm+dry bumps it up
+    # Levels: none(0) low(1) moderate(2) high(3) very_high(4)
+    pollen_to_num() {
+      case "$1" in
+        none) echo 0 ;; low) echo 1 ;; moderate) echo 2 ;; high) echo 3 ;; very_high) echo 4 ;; *) echo 0 ;;
+      esac
+    }
+    num_to_pollen() {
+      case "$1" in
+        0) echo "none" ;; 1) echo "low" ;; 2) echo "moderate" ;; 3) echo "high" ;; 4) echo "very_high" ;; *) echo "none" ;;
+      esac
+    }
+    adjust_pollen() {
+      local level=$1
+      local adj=$2
+      local result=$((level + adj))
+      [ "$result" -lt 0 ] && result=0
+      [ "$result" -gt 4 ] && result=4
+      echo "$result"
+    }
+
+    # Determine adjustment: -1 for rain/snow, +1 for warm+dry
+    POLLEN_ADJ=0
+    CONDITIONS_UPPER=$(echo "$CONDITIONS" | tr '[:lower:]' '[:upper:]')
+    case "$CONDITIONS_UPPER" in
+      *RAIN*|*SHOWER*|*STORM*|*DRIZZLE*) POLLEN_ADJ=-1 ;;
+      *SNOW*) POLLEN_ADJ=-1 ;;
+    esac
+    # Warm and dry bumps pollen up
+    if [ "$POLLEN_ADJ" -eq 0 ] && [ "$HIGH" -ge 70 ] 2>/dev/null; then
+      POLLEN_ADJ=1
+    fi
+
+    if [ "$POLLEN_ADJ" -ne 0 ]; then
+      TREE_NUM=$(pollen_to_num "$POLLEN_TREE")
+      GRASS_NUM=$(pollen_to_num "$POLLEN_GRASS")
+      WEED_NUM=$(pollen_to_num "$POLLEN_WEED")
+      # Only adjust types that are already active (not none)
+      [ "$TREE_NUM" -gt 0 ] && TREE_NUM=$(adjust_pollen "$TREE_NUM" "$POLLEN_ADJ")
+      [ "$GRASS_NUM" -gt 0 ] && GRASS_NUM=$(adjust_pollen "$GRASS_NUM" "$POLLEN_ADJ")
+      [ "$WEED_NUM" -gt 0 ] && WEED_NUM=$(adjust_pollen "$WEED_NUM" "$POLLEN_ADJ")
+      POLLEN_TREE=$(num_to_pollen "$TREE_NUM")
+      POLLEN_GRASS=$(num_to_pollen "$GRASS_NUM")
+      POLLEN_WEED=$(num_to_pollen "$WEED_NUM")
+      if [ "$POLLEN_ADJ" -gt 0 ]; then
+        echo "Pollen adjusted UP (warm/dry: ${HIGH}°F ${CONDITIONS})" >&2
+      else
+        echo "Pollen adjusted DOWN (precipitation: ${CONDITIONS})" >&2
+      fi
+    fi
+    echo "Pollen week: $MONDAY_MMDD (adjusted) - Tree:$POLLEN_TREE Grass:$POLLEN_GRASS Weed:$POLLEN_WEED" >&2
+  else
+    echo "Pollen week: $MONDAY_MMDD - no data found" >&2
   fi
 fi
 
@@ -289,8 +372,19 @@ build_info_board() {
     if [ -n "$PLANT_TASK" ]; then
       echo "- 'TASK: ${PLANT_TASK}'"
     fi
-    # Fallback if no planting data
-    if [ -z "$PLANT_SOW" ] && [ -z "$PLANT_START" ] && [ -z "$PLANT_TRANSPLANT" ] && [ -z "$PLANT_HARVEST" ] && [ -z "$PLANT_TASK" ]; then
+    # Pollen info (show when any type is not "none")
+    if [ "$POLLEN_TREE" != "none" ] || [ "$POLLEN_GRASS" != "none" ] || [ "$POLLEN_WEED" != "none" ]; then
+      POLLEN_LINE="POLLEN:"
+      [ "$POLLEN_TREE" != "none" ] && POLLEN_LINE="$POLLEN_LINE Tree $(echo "$POLLEN_TREE" | tr '[:lower:]' '[:upper:]')"
+      [ "$POLLEN_GRASS" != "none" ] && POLLEN_LINE="$POLLEN_LINE Grass $(echo "$POLLEN_GRASS" | tr '[:lower:]' '[:upper:]')"
+      [ "$POLLEN_WEED" != "none" ] && POLLEN_LINE="$POLLEN_LINE Weed $(echo "$POLLEN_WEED" | tr '[:lower:]' '[:upper:]')"
+      echo "- '${POLLEN_LINE}'"
+      if [ -n "$POLLEN_DOMINANT" ]; then
+        echo "- '(${POLLEN_DOMINANT})'"
+      fi
+    fi
+    # Fallback if no planting data and no pollen data
+    if [ -z "$PLANT_SOW" ] && [ -z "$PLANT_START" ] && [ -z "$PLANT_TRANSPLANT" ] && [ -z "$PLANT_HARVEST" ] && [ -z "$PLANT_TASK" ] && [ "$POLLEN_TREE" = "none" ] && [ "$POLLEN_GRASS" = "none" ] && [ "$POLLEN_WEED" = "none" ]; then
       echo "- 'Season winding down'"
       echo "- 'Check back next week'"
     fi

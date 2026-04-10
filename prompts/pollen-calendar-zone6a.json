@@ -1,0 +1,238 @@
+{
+  "_meta": {
+    "zone": "6a",
+    "location": "Cornwall, CT",
+    "notes": "Typical pollen levels by week for Zone 6a NW Connecticut. Keyed by Monday date (MM-DD). Levels: none, low, moderate, high, very_high."
+  },
+  "03-02": {
+    "tree": "none",
+    "grass": "none",
+    "weed": "none",
+    "dominant": [],
+    "summary": "No pollen - still dormant"
+  },
+  "03-09": {
+    "tree": "none",
+    "grass": "none",
+    "weed": "none",
+    "dominant": [],
+    "summary": "No pollen - still dormant"
+  },
+  "03-16": {
+    "tree": "low",
+    "grass": "none",
+    "weed": "none",
+    "dominant": ["elm", "maple"],
+    "summary": "Early tree pollen starting - elm, maple"
+  },
+  "03-23": {
+    "tree": "low",
+    "grass": "none",
+    "weed": "none",
+    "dominant": ["elm", "maple", "alder"],
+    "summary": "Tree pollen rising - elm, maple, alder"
+  },
+  "03-30": {
+    "tree": "moderate",
+    "grass": "none",
+    "weed": "none",
+    "dominant": ["maple", "birch", "elm"],
+    "summary": "Tree pollen moderate - maple, birch starting"
+  },
+  "04-06": {
+    "tree": "moderate",
+    "grass": "none",
+    "weed": "none",
+    "dominant": ["birch", "maple", "oak"],
+    "summary": "Birch and oak pollen rising"
+  },
+  "04-13": {
+    "tree": "high",
+    "grass": "none",
+    "weed": "none",
+    "dominant": ["birch", "oak", "maple"],
+    "summary": "Tree pollen HIGH - birch, oak peak starting"
+  },
+  "04-20": {
+    "tree": "high",
+    "grass": "none",
+    "weed": "none",
+    "dominant": ["oak", "birch", "ash"],
+    "summary": "Tree pollen HIGH - oak and birch peak"
+  },
+  "04-27": {
+    "tree": "very_high",
+    "grass": "none",
+    "weed": "none",
+    "dominant": ["oak", "birch", "pine"],
+    "summary": "PEAK TREE POLLEN - oak dominant"
+  },
+  "05-04": {
+    "tree": "very_high",
+    "grass": "low",
+    "weed": "none",
+    "dominant": ["oak", "pine", "birch"],
+    "summary": "PEAK TREE - oak, pine heavy. Grass starting"
+  },
+  "05-11": {
+    "tree": "high",
+    "grass": "low",
+    "weed": "none",
+    "dominant": ["oak", "pine", "hickory"],
+    "summary": "Tree pollen easing - oak, pine. Grass rising"
+  },
+  "05-18": {
+    "tree": "moderate",
+    "grass": "moderate",
+    "weed": "none",
+    "dominant": ["pine", "grass"],
+    "summary": "Tree pollen falling, grass pollen rising"
+  },
+  "05-25": {
+    "tree": "moderate",
+    "grass": "moderate",
+    "weed": "none",
+    "dominant": ["pine", "grass", "mulberry"],
+    "summary": "Pine and grass moderate"
+  },
+  "06-01": {
+    "tree": "low",
+    "grass": "high",
+    "weed": "none",
+    "dominant": ["grass", "pine"],
+    "summary": "Grass pollen HIGH - tree pollen fading"
+  },
+  "06-08": {
+    "tree": "low",
+    "grass": "high",
+    "weed": "none",
+    "dominant": ["grass"],
+    "summary": "Grass pollen HIGH"
+  },
+  "06-15": {
+    "tree": "low",
+    "grass": "high",
+    "weed": "low",
+    "dominant": ["grass"],
+    "summary": "PEAK GRASS POLLEN"
+  },
+  "06-22": {
+    "tree": "none",
+    "grass": "high",
+    "weed": "low",
+    "dominant": ["grass"],
+    "summary": "Grass pollen HIGH - weeds starting"
+  },
+  "06-29": {
+    "tree": "none",
+    "grass": "moderate",
+    "weed": "low",
+    "dominant": ["grass"],
+    "summary": "Grass pollen easing"
+  },
+  "07-07": {
+    "tree": "none",
+    "grass": "moderate",
+    "weed": "moderate",
+    "dominant": ["grass", "plantain", "nettle"],
+    "summary": "Grass moderate, weed pollen rising"
+  },
+  "07-14": {
+    "tree": "none",
+    "grass": "moderate",
+    "weed": "moderate",
+    "dominant": ["grass", "plantain"],
+    "summary": "Grass and weed moderate"
+  },
+  "07-21": {
+    "tree": "none",
+    "grass": "low",
+    "weed": "moderate",
+    "dominant": ["plantain", "nettle"],
+    "summary": "Grass fading, weed pollen moderate"
+  },
+  "07-28": {
+    "tree": "none",
+    "grass": "low",
+    "weed": "moderate",
+    "dominant": ["ragweed (early)", "plantain"],
+    "summary": "Early ragweed starting"
+  },
+  "08-04": {
+    "tree": "none",
+    "grass": "low",
+    "weed": "high",
+    "dominant": ["ragweed"],
+    "summary": "Ragweed season starting - HIGH"
+  },
+  "08-11": {
+    "tree": "none",
+    "grass": "low",
+    "weed": "high",
+    "dominant": ["ragweed"],
+    "summary": "Ragweed HIGH"
+  },
+  "08-18": {
+    "tree": "none",
+    "grass": "low",
+    "weed": "very_high",
+    "dominant": ["ragweed"],
+    "summary": "PEAK RAGWEED - very high"
+  },
+  "08-25": {
+    "tree": "none",
+    "grass": "none",
+    "weed": "very_high",
+    "dominant": ["ragweed"],
+    "summary": "PEAK RAGWEED continues"
+  },
+  "09-01": {
+    "tree": "none",
+    "grass": "none",
+    "weed": "very_high",
+    "dominant": ["ragweed"],
+    "summary": "PEAK RAGWEED - watch for heavy days"
+  },
+  "09-08": {
+    "tree": "none",
+    "grass": "none",
+    "weed": "high",
+    "dominant": ["ragweed"],
+    "summary": "Ragweed HIGH - easing with cooler nights"
+  },
+  "09-15": {
+    "tree": "none",
+    "grass": "none",
+    "weed": "moderate",
+    "dominant": ["ragweed"],
+    "summary": "Ragweed easing with first frost approaching"
+  },
+  "09-22": {
+    "tree": "none",
+    "grass": "none",
+    "weed": "moderate",
+    "dominant": ["ragweed"],
+    "summary": "Ragweed moderate - frost will end season"
+  },
+  "09-29": {
+    "tree": "none",
+    "grass": "none",
+    "weed": "low",
+    "dominant": ["ragweed"],
+    "summary": "Ragweed fading after frost"
+  },
+  "10-06": {
+    "tree": "none",
+    "grass": "none",
+    "weed": "low",
+    "dominant": [],
+    "summary": "Pollen season ending"
+  },
+  "10-13": {
+    "tree": "none",
+    "grass": "none",
+    "weed": "none",
+    "dominant": [],
+    "summary": "Pollen season over"
+  }
+}
