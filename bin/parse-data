@@ -102,7 +102,7 @@ echo "Parsing data with Claude Haiku..." >&2
 
 # Call Claude with haiku model and text output format
 # Unset CLAUDECODE to allow running from within a Claude Code session
-RESULT=$(echo "$PROMPT" | CLAUDECODE= claude --model haiku -p 2>/dev/null)
+RESULT=$(echo "$PROMPT" | CLAUDECODE= claude --model haiku --print --permission-mode bypassPermissions 2>/dev/null)
 
 # Extract JSON from the result - handle markdown code blocks
 CLEAN_RESULT=$(echo "$RESULT" | sed 's/^```json//' | sed 's/^```//' | sed 's/```$//')

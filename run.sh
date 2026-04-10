@@ -38,9 +38,13 @@ if [ -n "$FINAL_IMAGE" ] && [ -f "$FINAL_IMAGE" ]; then
 Co-Authored-By: Claude <agent@anthropic.com>"
     git push
     
+    # Build the specific GitHub raw URL for this dated image
+    SPECIFIC_URL="https://raw.githubusercontent.com/The-Focus-AI/trmnl-image-agent/main/${FINAL_IMAGE}"
+
     echo ""
     echo "Changes committed and pushed"
-    echo "GitHub Pages will deploy latest.png automatically"
+    echo "TRMNL image updated — $SPECIFIC_URL hosted on GitHub"
+    echo "GitHub Pages latest: https://the-focus-ai.github.io/trmnl-image-agent/latest.png"
     echo "Copied to: $OPENCLAW_MEDIA_DIR/latest.png"
 fi
 
