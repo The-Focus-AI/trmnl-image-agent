@@ -3,24 +3,27 @@
 # Generates image, copies to latest.png, commits and pushes
 # GitHub Pages serves latest.png for TRMNL Image Display plugin
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Load .env file if it exists
 if [ -f "$SCRIPT_DIR/.env" ]; then
-    export $(grep -v '^#' "$SCRIPT_DIR/.env" | xargs)
+    set -a
+    # shellcheck disable=SC1090
+    . "$SCRIPT_DIR/.env"
+    set +a
 fi
 
 # Verify required variables
-if [ -z "$GEMINI_API_KEY" ]; then
+if [ -z "${GEMINI_API_KEY:-}" ]; then
     echo "Error: GEMINI_API_KEY not set"
-    echo "Set it in .env or environment"
+    echo "Set it in .env, environment, or make sure 1Password CLI is available to bin/generate-image"
     exit 1
 fi
 
 # Run the modular update script and capture the final image path
-FINAL_IMAGE=$("$SCRIPT_DIR/bin/update-display" | tail -1)
+FINAL_IMAGE=$("$SCRIPT_DIR/bin/update-display")
 
 # Also copy the latest image into OpenClaw's state media dir so local-path sends work
 # (OpenClaw allowlists ~/.openclaw/media by default.)
@@ -32,7 +35,7 @@ if [ -n "$FINAL_IMAGE" ] && [ -f "$FINAL_IMAGE" ]; then
     cp -f "$FINAL_IMAGE" "$OPENCLAW_MEDIA_DIR/latest.png"
 
     cd "$SCRIPT_DIR"
-    git add output/
+    git add output/ bin/ trmnl_prompt_builder.py tests/ README.md CLAUDE.md prompts/ || true
     git commit -m "Update TRMNL image
 
 Co-Authored-By: Claude <agent@anthropic.com>"

@@ -3,7 +3,7 @@
 # Runs all steps: fetch → parse → prompt → generate → process
 # Then commit/push to deploy via GitHub Pages
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 START_TIME=$(date +%s)

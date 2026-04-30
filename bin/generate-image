@@ -3,11 +3,14 @@
 # Uses prompt from /tmp/trmnl-prompt.txt
 # Outputs to output/YYYY-MM/YYYY-MM-DD-HH-MM-full.png
 
-set -e
+set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 PROMPT_FILE="${1:-/tmp/trmnl-prompt.txt}"
 OUTPUT_DIR="output/$(date +%Y-%m)"
 OUTPUT_FILE="$OUTPUT_DIR/$(date +%Y-%m-%d-%H-%M)-full.png"
+ENV_FILE="$PROJECT_DIR/.env"
 
 if [ ! -f "$PROMPT_FILE" ]; then
   echo "Error: Prompt file not found: $PROMPT_FILE" >&2
@@ -18,10 +21,18 @@ fi
 # Ensure output directory exists
 mkdir -p "$OUTPUT_DIR"
 
+# Load .env if available before falling back to 1Password
+if [ -z "${GEMINI_API_KEY:-}" ] && [ -f "$ENV_FILE" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  . "$ENV_FILE"
+  set +a
+fi
+
 # Check for GEMINI_API_KEY
-if [ -z "$GEMINI_API_KEY" ]; then
-  if command -v op &> /dev/null; then
-    export GEMINI_API_KEY=$(op read "op://Development/Google AI Studio Key/notesPlain")
+if [ -z "${GEMINI_API_KEY:-}" ]; then
+  if command -v op >/dev/null 2>&1; then
+    export GEMINI_API_KEY="$(op read 'op://Development/Google AI Studio Key/notesPlain')"
   else
     echo "Error: GEMINI_API_KEY not set and 1Password CLI not available" >&2
     exit 1

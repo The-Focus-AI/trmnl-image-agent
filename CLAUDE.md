@@ -25,17 +25,15 @@ For each variable, first check if it's already set in the environment. If not se
 
 ## Seasonal Display Modes
 
-The dashboard automatically selects a display mode:
+The dashboard now uses an overlapping **season stack** instead of a single hard seasonal mode.
 
-| Priority | Condition | Mode | Info Board |
-|----------|-----------|------|------------|
-| 1 | Mohawk open + sap flowing | `blended` | Ski + Maple |
-| 2 | Mohawk closed + sap flowing | `maple` | Maple season |
-| 3 | Mohawk open | `ski` | Ski conditions |
-| 4 | Mar 16 - May 15 | `spring` | Plant This Week + Pollen |
-| 5 | May 16 - Sep 15 | `summer` | Plant This Week + Pollen |
-| 6 | Sep 16 - Nov 30 | `fall` | Plant This Week + Pollen |
-| 7 | Default | `ski` | Ski conditions |
+### Core model
+- **Backdrop season**: deep winter, late winter, spring transition, green-up, high summer, harvest, leaf-fall
+- **Operational regimes**: ski, sap, frost, planting, harvest, pollen, school, heat, storm
+- **Primary story**: the highest-priority actionable regime becomes the headline
+- **Style of the week**: deterministic weekly rotation across monochrome-friendly styles
+
+The prompt builder (`trmnl_prompt_builder.py`) scores active regimes using date, live weather, school events, planting calendar, pollen calendar, and Mohawk status. The generated prompt then asks the image model to show overlapping realities in a single coherent layout.
 
 ### Planting Calendar
 Static data in `prompts/planting-calendar-zone6a.json` — week-by-week Zone 6a planting guide (Mar-Oct). Used by `bin/build-prompt` for the "PLANT THIS WEEK" info board.

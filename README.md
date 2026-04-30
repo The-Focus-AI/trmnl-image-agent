@@ -14,6 +14,12 @@ This project generates dashboard images and serves them via **GitHub Pages**. Yo
 https://the-focus-ai.github.io/trmnl-image-agent/latest.png
 ```
 
+The dashboard is now driven by a **Cornwall Seasonal State Engine**:
+- multiple overlapping seasonal regimes can be active at once (`ski`, `sap`, `frost`, `planting`, `harvest`, `pollen`, `school`, `heat`, `storm`)
+- live weather modulates which regimes are active and urgent
+- one **primary story** becomes the headline
+- the visual treatment rotates with a deterministic **style of the week** (woodcut, Swiss, field guide, WPA, etc.)
+
 ## Prerequisites
 
 - A TRMNL device
