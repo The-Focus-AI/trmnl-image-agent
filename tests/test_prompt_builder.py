@@ -135,7 +135,8 @@ class DashboardStateTests(unittest.TestCase):
         self.assertIn("OAK", board["lines"][1])
         self.assertIn("BIRCH", board["lines"][1])
         self.assertIn("PINE", board["lines"][1])
-        self.assertTrue(board["lines"][2].startswith("HARVEST: "))
+        self.assertTrue(board["lines"][2].startswith(("TRANSPLANT: ", "SOW: ")))
+        self.assertNotIn("HARVEST:", board["lines"][2])
         self.assertEqual(board["lines"][3], "LIMIT TREE POLLEN EXPOSURE")
         self.assertEqual(state["banner_text"], "LIMIT TREE POLLEN EXPOSURE")
 

@@ -426,12 +426,12 @@ def build_board(primary_story: dict, active_stack: list[dict], planting_week: di
         if primary_story.get("id") == "pollen":
             if dominant:
                 lines.append(f"WORST: {' • '.join(dominant[:3])}")
-            if harvest:
-                lines.append(f"HARVEST: {', '.join(harvest[:2]).upper()}")
-            elif transplant:
+            if transplant:
                 lines.append(f"TRANSPLANT: {', '.join(transplant[:2]).upper()}")
             elif direct_sow:
                 lines.append(f"SOW: {', '.join(direct_sow[:2]).upper()}")
+            elif harvest:
+                lines.append(f"HARVEST: {', '.join(harvest[:2]).upper()}")
             elif tasks:
                 lines.append(f"TASK: {tasks[0].upper()}")
             lines.append(primary_story["action"])
