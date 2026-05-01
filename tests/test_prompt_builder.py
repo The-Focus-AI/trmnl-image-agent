@@ -53,7 +53,7 @@ class DashboardStateTests(unittest.TestCase):
 
         self.assertEqual(state["primary_story"]["id"], "frost")
         self.assertIn("sap", [item["id"] for item in state["active_stack"]])
-        self.assertEqual(state["board"]["title"], "SEASON STACK")
+        self.assertEqual(state["board"]["title"], "TODAY")
         self.assertIn("COVER", state["action_line"])
 
     def test_pollen_scene_uses_species_not_generic_blossoms(self):
@@ -115,12 +115,29 @@ class DashboardStateTests(unittest.TestCase):
         self.assertIn("The words OAK, BIRCH, and PINE must not appear anywhere in the artwork", prompt)
         self.assertIn("Do not put species names under the specimen studies", prompt)
         self.assertIn("oversized date and weather numerals", prompt)
-        self.assertIn("make the SEASON STACK panel text larger, fewer, and bolder", prompt)
-        self.assertIn("If the layout gets crowded, drop nonessential subtitle or metadata text before shrinking primary data", prompt)
+        self.assertIn("No fifth box, no repeated wind box, no tiny sublabels", prompt)
+        self.assertIn("treat this as a bold summary board with EXACTLY these four lines in this order", prompt)
+        self.assertIn("No stack jargon", prompt)
+        self.assertIn("do not repeat the exact same pollen message", prompt)
+        self.assertIn("If the layout gets crowded, delete nonessential metadata before shrinking primary data", prompt)
+        self.assertIn("Avoid small machinery, extra landscape details, dense background scenery", prompt)
         self.assertIn("EXACTLY four stacked weather sign panels", prompt)
-        self.assertIn("Do not duplicate any weather line", prompt)
+        self.assertIn("5:3 landscape format at 800x480", prompt)
+        self.assertIn("Render at exactly 800x480 pixels natively", prompt)
+        self.assertNotIn("16:9 landscape format", prompt)
+        self.assertNotIn("pollen up", prompt.lower())
+        self.assertNotIn("WAXING CRESCENT MOON", prompt)
+        self.assertEqual(board["title"], "TODAY")
         self.assertEqual(board["subtitle"], "")
         self.assertLessEqual(len(board["lines"]), 4)
+        self.assertEqual(board["lines"][0], "TREE POLLEN VERY HIGH")
+        self.assertTrue(board["lines"][1].startswith("WORST: "))
+        self.assertIn("OAK", board["lines"][1])
+        self.assertIn("BIRCH", board["lines"][1])
+        self.assertIn("PINE", board["lines"][1])
+        self.assertTrue(board["lines"][2].startswith("HARVEST: "))
+        self.assertEqual(board["lines"][3], "LIMIT TREE POLLEN EXPOSURE")
+        self.assertEqual(state["banner_text"], "LIMIT TREE POLLEN EXPOSURE")
 
     def test_pollen_secondary_still_forces_botanical_truth_mode(self):
         parsed = {
@@ -161,6 +178,26 @@ class DashboardStateTests(unittest.TestCase):
         prompt = render_prompt(parsed, state)
         self.assertIn("BOTANICAL TRUTH MODE", prompt)
         self.assertIn("botanical pollen bulletin board for Cornwall rather than a scenic poster", prompt)
+
+    def test_full_moon_phase_is_optional_but_allowed(self):
+        parsed = {
+            "date": "THU 30 APR",
+            "timestamp": "6:01 PM",
+            "weather": {"temperature": 52, "conditions": "CLEAR", "wind": "Variable 3 mph", "wind_chill": None, "high": 52, "low": 36},
+            "alerts": {"weather_alert": None, "mountain_alert": None},
+            "mohawk": {"status": "closed_season", "trails_open": 0, "trails_total": 27, "lifts_open": 0, "base_depth": 0, "surface": "N/A", "fresh_snow": None},
+            "maple": {"sap_flowing": False, "quality": "poor", "high": 52, "low": 36},
+            "sun_moon": {"sunrise": "4:59 AM", "sunset": "6:46 PM", "moon_phase": "full moon"},
+            "banner": {"type": "normal", "text": None},
+            "season_indicators": {"frost_risk": "none", "growing_conditions": "good"},
+        }
+        planting = {"04-27": {"direct_sow": [], "indoor_starts": [], "transplant": [], "harvest": [], "tasks": [], "highlight": ""}}
+        pollen = {"04-27": {"tree": "moderate", "grass": "none", "weed": "none", "dominant": ["oak"], "summary": "tree pollen present"}}
+        school = {"events": []}
+
+        state = build_dashboard_state(parsed, planting, pollen, school, now=dt.date(2026, 4, 30))
+        prompt = render_prompt(parsed, state)
+        self.assertIn("FULL MOON", prompt)
 
     def test_harvest_story_surfaces_in_fall(self):
         parsed = {

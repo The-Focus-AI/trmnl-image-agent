@@ -1,0 +1,13 @@
+{
+  "name": "trmnl-image-agent",
+  "private": true,
+  "type": "module",
+  "description": "Local utilities for TRMNL image generation",
+  "scripts": {
+    "gemini-image": "node scripts/gemini-image-cli.mjs"
+  },
+  "dependencies": {
+    "@google/genai": "^1.30.0",
+    "dotenv": "^17.2.3"
+  }
+}

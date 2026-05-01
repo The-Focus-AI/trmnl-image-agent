@@ -1,5 +1,5 @@
 #!/bin/bash
-# Generate TRMNL image using nano-banana
+# Generate TRMNL image using local Gemini image wrapper
 # Uses prompt from /tmp/trmnl-prompt.txt
 # Outputs to output/YYYY-MM/YYYY-MM-DD-HH-MM-full.png
 
@@ -11,6 +11,10 @@ PROMPT_FILE="${1:-/tmp/trmnl-prompt.txt}"
 OUTPUT_DIR="output/$(date +%Y-%m)"
 OUTPUT_FILE="$OUTPUT_DIR/$(date +%Y-%m-%d-%H-%M)-full.png"
 ENV_FILE="$PROJECT_DIR/.env"
+IMAGE_MODEL="${TRMNL_IMAGE_MODEL:-gemini-3.1-flash-image-preview}"
+IMAGE_SIZE="${TRMNL_IMAGE_SIZE:-1K}"
+IMAGE_ASPECT="${TRMNL_IMAGE_ASPECT:-}"
+IMAGE_MIME_TYPE="${TRMNL_IMAGE_MIME_TYPE:-image/png}"
 
 if [ ! -f "$PROMPT_FILE" ]; then
   echo "Error: Prompt file not found: $PROMPT_FILE" >&2
@@ -39,7 +43,30 @@ if [ -z "${GEMINI_API_KEY:-}" ]; then
   fi
 fi
 
-echo "Generating image with nano-banana..." >&2
-npx @the-focus-ai/nano-banana --prompt-file "$PROMPT_FILE" --output "$OUTPUT_FILE"
+if [ ! -d "$PROJECT_DIR/node_modules" ]; then
+  echo "Installing local Node dependencies for Gemini image wrapper..." >&2
+  npm install --no-fund --no-audit >&2
+fi
+
+CMD=(node "$PROJECT_DIR/scripts/gemini-image-cli.mjs" \
+  --prompt-file "$PROMPT_FILE" \
+  --output "$OUTPUT_FILE" \
+  --model "$IMAGE_MODEL" \
+  --image-size "$IMAGE_SIZE" \
+  --mime-type "$IMAGE_MIME_TYPE")
+
+if [ -n "$IMAGE_ASPECT" ]; then
+  CMD+=(--aspect "$IMAGE_ASPECT")
+fi
+
+echo "Generating image with local Gemini wrapper..." >&2
+echo "  model:       $IMAGE_MODEL" >&2
+echo "  image_size:  $IMAGE_SIZE" >&2
+if [ -n "$IMAGE_ASPECT" ]; then
+  echo "  aspect:      $IMAGE_ASPECT" >&2
+else
+  echo "  aspect:      prompt-driven (no API aspect override)" >&2
+fi
+"${CMD[@]}"
 
 echo "$OUTPUT_FILE"

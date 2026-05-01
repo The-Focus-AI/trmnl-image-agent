@@ -151,6 +151,10 @@ def adjust_pollen_level(level: str, conditions: str, high: int) -> str:
     return "none"
 
 
+def pollen_level_label(level: str) -> str:
+    return level.replace("_", " ").upper()
+
+
 def describe_pollen_motif(pollen_week: dict) -> str:
     dominant = [normalize_text(item).lower() for item in (pollen_week.get("dominant", []) or []) if normalize_text(item)]
     if not dominant:
@@ -358,12 +362,14 @@ def build_regimes(parsed: dict, planting_week: dict, pollen_week: dict, school_e
         dominant = pollen_week.get("dominant", []) or []
         summary = normalize_text(pollen_week.get("summary"))
         label = [k for k, v in [("Tree", tree), ("Grass", grass), ("Weed", weed)] if POLLEN_LEVELS.get(v, 0) == pollen_value]
+        focus_type = label[0].upper() if label else "POLLEN"
+        focus_level = pollen_level_label(tree if "Tree" in label else grass if "Grass" in label else weed if "Weed" in label else tree)
         regimes.append({
             "id": "pollen",
             "label": "Pollen",
             "score": 0.44 + pollen_value * 0.08,
-            "headline": "POLLEN UP" if pollen_value >= 3 else "POLLEN ACTIVE",
-            "action": "PLAN ACCORDINGLY",
+            "headline": f"{focus_type} POLLEN {focus_level}",
+            "action": "LIMIT TREE POLLEN EXPOSURE",
             "notes": [f"Peak: {'/'.join(label)}", ', '.join(dominant) or summary],
         })
 
@@ -404,31 +410,51 @@ def build_regimes(parsed: dict, planting_week: dict, pollen_week: dict, school_e
 
 
 def build_board(primary_story: dict, active_stack: list[dict], planting_week: dict, pollen_info: dict, school_event: dict | None, style: dict):
-    stack_names = " • ".join(item["id"].upper() for item in active_stack[:4]) or "QUIET WEEK"
     compact = style.get("alert_readability_bias") or any(item["id"] == "pollen" for item in active_stack)
-    lines = [
-        f"HEADLINE: {primary_story['headline']}",
-        f"ACTION: {primary_story['action']}",
-        f"STACK: {stack_names}",
-    ]
 
     direct_sow = planting_week.get("direct_sow", []) or []
     transplant = planting_week.get("transplant", []) or []
     harvest = planting_week.get("harvest", []) or []
     tasks = planting_week.get("tasks", []) or []
+    dominant = [normalize_text(item).upper() for item in (pollen_info.get("dominant", []) or []) if normalize_text(item)]
 
     if compact:
-        if pollen_info.get("tree", "none") != "none":
-            lines.append(f"TREE POLLEN: {pollen_info.get('tree', 'none').upper()}")
-        elif harvest:
-            lines.append(f"HARVEST: {', '.join(harvest[:2])}")
-        elif transplant:
-            lines.append(f"TRANSPLANT: {', '.join(transplant[:2])}")
-        elif direct_sow:
-            lines.append(f"SOW: {', '.join(direct_sow[:2])}")
-        elif tasks:
-            lines.append(f"TASK: {tasks[0]}")
+        title = "TODAY"
+        lines = [
+            primary_story["headline"],
+        ]
+        if primary_story.get("id") == "pollen":
+            if dominant:
+                lines.append(f"WORST: {' • '.join(dominant[:3])}")
+            if harvest:
+                lines.append(f"HARVEST: {', '.join(harvest[:2]).upper()}")
+            elif transplant:
+                lines.append(f"TRANSPLANT: {', '.join(transplant[:2]).upper()}")
+            elif direct_sow:
+                lines.append(f"SOW: {', '.join(direct_sow[:2]).upper()}")
+            elif tasks:
+                lines.append(f"TASK: {tasks[0].upper()}")
+            lines.append(primary_story["action"])
+        else:
+            lines.append(primary_story["action"])
+            if pollen_info.get("tree", "none") != "none":
+                lines.append(f"TREE POLLEN {pollen_level_label(pollen_info.get('tree', 'none'))}")
+            elif harvest:
+                lines.append(f"HARVEST: {', '.join(harvest[:2]).upper()}")
+            elif transplant:
+                lines.append(f"TRANSPLANT: {', '.join(transplant[:2]).upper()}")
+            elif direct_sow:
+                lines.append(f"SOW: {', '.join(direct_sow[:2]).upper()}")
+            elif tasks:
+                lines.append(f"TASK: {tasks[0].upper()}")
+            if dominant:
+                lines.append(f"WORST: {' • '.join(dominant[:3])}")
     else:
+        title = "TODAY"
+        lines = [
+            primary_story["headline"],
+            primary_story["action"],
+        ]
         if harvest:
             lines.append(f"HARVEST: {', '.join(harvest[:3])}")
         elif transplant:
@@ -442,21 +468,23 @@ def build_board(primary_story: dict, active_stack: list[dict], planting_week: di
         for name in ["tree", "grass", "weed"]:
             level = pollen_info.get(name, "none")
             if level != "none":
-                pollen_bits.append(f"{name[:1].upper()}:{level.upper()}")
+                pollen_bits.append(f"{name.title()} {pollen_level_label(level)}")
         if pollen_bits:
-            lines.append(f"POLLEN: {' '.join(pollen_bits)}")
+            lines.append(" / ".join(pollen_bits))
+        if dominant:
+            lines.append(f"Worst: {' • '.join(dominant[:3])}")
 
     if school_event and not compact:
         lines.append(school_event["text"].upper())
 
     return {
-        "title": "SEASON STACK",
+        "title": title,
         "subtitle": "" if compact else f"{style['name']} • {style['week_label']}",
         "lines": lines[:4] if compact else lines[:6],
     }
 
 
-def determine_banner(primary_story: dict, active_stack: list[dict], school_event: dict | None, planting_week: dict):
+def determine_banner(primary_story: dict, active_stack: list[dict], school_event: dict | None, planting_week: dict, pollen_info: dict):
     text = primary_story["headline"]
     if primary_story["id"] == "frost":
         text = f"{primary_story['headline']} • {primary_story['action']}"
@@ -465,6 +493,8 @@ def determine_banner(primary_story: dict, active_stack: list[dict], school_event
         text = highlight.upper() if highlight else f"{primary_story['headline']} • {primary_story['action']}"
     elif primary_story["id"] == "sap":
         text = f"{primary_story['headline']} • {primary_story['action']}"
+    elif primary_story["id"] == "pollen":
+        text = primary_story["action"]
 
     if school_event and primary_story["id"] != "school":
         text = f"{text} • {school_event['text'].upper()}"
@@ -533,7 +563,7 @@ def build_dashboard_state(parsed: dict, planting: dict, pollen: dict, school: di
     style = compute_style_of_week(now, backdrop, primary_story["id"])
     board = build_board(primary_story, active_stack, planting_week, pollen_info, school_event, style)
     action_line = primary_story["action"]
-    banner_text = determine_banner(primary_story, active_stack, school_event, planting_week)
+    banner_text = determine_banner(primary_story, active_stack, school_event, planting_week, pollen_info)
 
     return {
         "date": now.isoformat(),
@@ -562,7 +592,6 @@ def render_prompt(parsed: dict, state: dict) -> str:
     wind_chill = weather.get("wind_chill")
     style = state["style"]
     board = state["board"]
-    active_ids = ", ".join(item["id"].upper() for item in state["active_stack"][:5])
     extra_left = []
     compact_text_mode = board.get("subtitle", "") == ""
     if wind_chill not in (None, "", "null"):
@@ -614,37 +643,40 @@ BOTANICAL TRUTH MODE:
 - Do not put species names under the specimen studies; the morphology must carry the identification.
 - Avoid generic deciduous tree symbols, decorative blossom motifs, and anonymous conifer silhouettes.
 """
-    prompt = f"""Black and white 1-bit illustration for TRMNL e-ink display. Wide 16:9 landscape format at 800x480. Use ONLY pure black and pure white with no gray tones. All shading must be hatching, cross-hatching, stipple, or solid fills that survive thresholding.
+
+    moon_phase = normalize_text(sun_moon.get('moon_phase'), '')
+    moon_phase_lower = moon_phase.lower()
+    moon_strip = ""
+    if moon_phase and any(token in moon_phase_lower for token in ["full", "new"]):
+        moon_strip = f"\nTOP RIGHT - if there is obvious empty space after the main text is already large and readable, a single small bold moon strip may be shown: '{moon_phase.upper()}'. Do not show moon info for any other phase and do not use separate sunrise/sunset widgets.\n"
+
+    prompt = f"""Black and white 1-bit illustration for TRMNL e-ink display. Wide 5:3 landscape format at 800x480. Compose for the final TRMNL frame itself rather than a wider cinematic canvas. Render at exactly 800x480 pixels natively if the model supports explicit output dimensions; do not simulate a wider poster that will need later reframing. Use ONLY pure black and pure white with no gray tones. All shading must be hatching, cross-hatching, stipple, or solid fills that survive thresholding.
 
 SCENE: {scene_text}{pollen_truth_block}
 
-PRIMARY STORY: The display is a Cornwall Seasonal State Engine. Multiple regimes overlap at once. Active stack right now: {active_ids}. The top story is '{state['primary_story']['headline']}' and the action line is '{state['action_line']}'.
+PRIMARY STORY: The image should explain today's most useful outdoor information at a glance. Use plain language. If pollen is high, say exactly which kind of pollen is high rather than vague slogans.
 
-LEFT SIDE - a single simple town signpost with EXACTLY four stacked weather sign panels and no extras, with oversized date and weather numerals that can be read instantly on a low-resolution e-ink screen. Do not duplicate any weather line or repeat wind text:
+LEFT SIDE - a single simple town signpost with EXACTLY four stacked weather sign panels and no extras, with oversized date and weather numerals that can be read instantly on a low-resolution e-ink screen. Make these four boxes large, simple, and bolder than everything except the main headline. No fifth box, no repeated wind box, no tiny sublabels:
 - '{parsed.get('date', '')}'
-- '{temp}°F {conditions}'
-- 'HIGH {high}°F / LOW {low}°F'
-- '{wind.upper()}'{extra_left_text}
-
-TOP RIGHT - if space is tight, simplify or omit these three framed icons before shrinking main text; when shown, keep them bold enough for 800x480:
-- Sunrise '{normalize_text(sun_moon.get('sunrise'), '6:00 AM')}'
-- Moon '{normalize_text(sun_moon.get('moon_phase'), 'moon phase')}'
-- Sunset '{normalize_text(sun_moon.get('sunset'), '7:00 PM')}'
-
-RIGHT SIDE - {style['board_material']} titled '{board['title']}' showing; make the SEASON STACK panel text larger, fewer, and bolder than a normal poster, with short labels and generous spacing. Drop the subtitle entirely if it hurts legibility:
+- '{temp}° {conditions}'
+- 'H {high}° / L {low}°'
+- '{wind.upper()}'{extra_left_text}{moon_strip}
+RIGHT SIDE - {style['board_material']} titled '{board['title']}' showing; treat this as a bold summary board with EXACTLY these four lines in this order, one line per row, and no extra rows or paraphrases. No stack jargon, no repeated pollen line, no tiny explanatory labels, generous padding, and heavy lettering. The right panel must stay fully inside frame with comfortable margins and no cropped side content:
 {board_lines}
 
-BOTTOM CENTER - dominant banner ribbon with '{state['banner_text']}'
+BOTTOM CENTER - use a simple solid headline bar with '{state['banner_text']}'. Prefer a plain bold bar over an ornate ribbon, and do not repeat the exact same pollen message in both the bar and the right panel.
 
-BOTTOM LEFT CORNER - small framed update stamp 'Updated {parsed.get('timestamp', '')}'
+BOTTOM LEFT CORNER - omit the update stamp entirely if it competes with readability. If there is abundant empty space, show only a tiny plain line 'Updated {parsed.get('timestamp', '')}'.
 
 STYLE OF THE WEEK: {style['name']}. {style['prompt']}
 
 LAYOUT RULES:
-- Keep text crisp, high-contrast, and actually readable after 1-bit conversion.
+- Prioritize legibility over ornament, texture, scenery, and style flourishes.
+- Use thick outlines, large shapes, minimal hatching, and broad white space.
 - Favor fewer words at larger sizes over more words at tiny sizes.
 - Make the date, current temperature, headline, and action line the largest text blocks on the page.
-- If the layout gets crowded, drop nonessential subtitle or metadata text before shrinking primary data.
+- If the layout gets crowded, delete nonessential metadata before shrinking primary data.
+- Avoid small machinery, extra landscape details, dense background scenery, or fine decorative textures.
 - Preserve a single strong headline hierarchy.
 - Show overlapping seasonal realities in one coherent landscape rather than a single simplistic season.
 - The aesthetic should feel like a local Cornwall bulletin board curated by a different print/design tradition each week.
