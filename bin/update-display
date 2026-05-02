@@ -70,5 +70,27 @@ echo "" >&2
 echo "Commit and push to deploy via GitHub Pages" >&2
 echo "==========================================" >&2
 
+PUBLISH_ON_SUCCESS="${PUBLISH_ON_SUCCESS:-1}"
+if [ "$PUBLISH_ON_SUCCESS" = "1" ]; then
+  REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+  OPENCLAW_MEDIA_DIR="$HOME/.openclaw/media/trmnl"
+
+  mkdir -p "$OPENCLAW_MEDIA_DIR"
+  cp -f "$FINAL_IMAGE" "$OPENCLAW_MEDIA_DIR/latest.png"
+
+  if git -C "$REPO_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    git -C "$REPO_DIR" add output/ bin/ trmnl_prompt_builder.py tests/ README.md CLAUDE.md prompts/ || true
+    if ! git -C "$REPO_DIR" diff --cached --quiet --ignore-submodules --; then
+      git -C "$REPO_DIR" commit -m "Update TRMNL image
+
+Co-Authored-By: Claude <agent@anthropic.com>"
+      git -C "$REPO_DIR" push
+      echo "Published latest TRMNL image to GitHub Pages" >&2
+    else
+      echo "No publishable git changes detected" >&2
+    fi
+  fi
+fi
+
 # Output the final image path for scripting (only stdout line)
 echo "$FINAL_IMAGE"

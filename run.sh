@@ -25,30 +25,14 @@ fi
 # Run the modular update script and capture the final image path
 FINAL_IMAGE=$("$SCRIPT_DIR/bin/update-display")
 
-# Also copy the latest image into OpenClaw's state media dir so local-path sends work
-# (OpenClaw allowlists ~/.openclaw/media by default.)
-OPENCLAW_MEDIA_DIR="$HOME/.openclaw/media/trmnl"
-
-# Commit and push changes (latest.png is already created by process-image)
 if [ -n "$FINAL_IMAGE" ] && [ -f "$FINAL_IMAGE" ]; then
-    mkdir -p "$OPENCLAW_MEDIA_DIR"
-    cp -f "$FINAL_IMAGE" "$OPENCLAW_MEDIA_DIR/latest.png"
-
-    cd "$SCRIPT_DIR"
-    git add output/ bin/ trmnl_prompt_builder.py tests/ README.md CLAUDE.md prompts/ || true
-    git commit -m "Update TRMNL image
-
-Co-Authored-By: Claude <agent@anthropic.com>"
-    git push
-    
     # Build the specific GitHub raw URL for this dated image
     SPECIFIC_URL="https://raw.githubusercontent.com/The-Focus-AI/trmnl-image-agent/main/${FINAL_IMAGE}"
 
     echo ""
-    echo "Changes committed and pushed"
     echo "TRMNL image updated — $SPECIFIC_URL hosted on GitHub"
     echo "GitHub Pages latest: https://the-focus-ai.github.io/trmnl-image-agent/latest.png"
-    echo "Copied to: $OPENCLAW_MEDIA_DIR/latest.png"
+    echo "Copied to: $HOME/.openclaw/media/trmnl/latest.png"
 fi
 
 echo ""
