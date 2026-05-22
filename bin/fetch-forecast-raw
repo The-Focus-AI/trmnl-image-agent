@@ -1,0 +1,16 @@
+#!/bin/bash
+# Fetch NWS 7-day grid forecast JSON for Cornwall, CT
+# Outputs structured JSON with precipitation probability, thunderstorm text, etc.
+# Output to /tmp/trmnl-data/forecast.json
+
+set -euo pipefail
+
+OUTPUT_DIR="/tmp/trmnl-data"
+OUTPUT_FILE="$OUTPUT_DIR/forecast.json"
+FORECAST_URL="https://api.weather.gov/gridpoints/ALY/92,29/forecast"
+
+mkdir -p "$OUTPUT_DIR"
+
+curl -sL -H "Accept: application/json" "$FORECAST_URL" > "$OUTPUT_FILE"
+
+echo "$OUTPUT_FILE"

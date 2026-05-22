@@ -131,7 +131,7 @@ def compute_style_of_week(day: dt.date, backdrop: str, primary_story_id: str) ->
     style_id = pool[day.isocalendar().week % len(pool)]
     style = dict(STYLE_LIBRARY[style_id])
     style["season_family"] = family
-    style["alert_readability_bias"] = primary_story_id in {"storm", "frost", "heat", "school"}
+    style["alert_readability_bias"] = primary_story_id in {"storm", "frost", "heat", "school", "heavy_rain", "thunderstorm"}
     if style["alert_readability_bias"]:
         style["prompt"] += " Preserve maximum alert readability with oversized headline blocks, clean iconography, and short high-contrast labels."
     style["week_label"] = f"WEEK {day.isocalendar().week}"
@@ -241,6 +241,7 @@ def build_regimes(parsed: dict, planting_week: dict, pollen_week: dict, school_e
     low = safe_int(weather.get("low"), 20)
     conditions = normalize_text(weather.get("conditions"), "FAIR")
     frost_risk = normalize_text(season.get("frost_risk"), "none")
+    forecast = parsed.get("forecast", {})
     regimes = []
 
     weather_alert = normalize_text(alerts.get("weather_alert"))
@@ -384,6 +385,51 @@ def build_regimes(parsed: dict, planting_week: dict, pollen_week: dict, school_e
             "notes": [school_event["type"].replace('_', ' ').upper(), school_event["date"]],
         })
 
+    # Heavy rain / washout regime — from NWS forecast precip probability
+    today_precip = safe_int(forecast.get("today_precip_chance"))
+    tonight_precip = safe_int(forecast.get("tonight_precip_chance"))
+    max_precip = max(today_precip, tonight_precip)
+    if max_precip >= 60 and not (weather_alert or normalize_text(banner.get("type")) == "storm_warning"):
+        if max_precip >= 90:
+            score = 0.86
+            headline = f"RAIN LIKELY {max_precip}%"
+            action = "PLAN INDOOR DAY"
+        elif max_precip >= 75:
+            score = 0.78
+            headline = f"RAIN LIKELY {max_precip}%"
+            action = "PLAN AHEAD"
+        else:
+            score = 0.72
+            headline = f"RAIN EXPECTED {max_precip}%"
+            action = "CARRY RAIN GEAR"
+        regimes.append({
+            "id": "heavy_rain",
+            "label": "Heavy Rain",
+            "score": score,
+            "headline": headline,
+            "action": action,
+            "notes": [
+                f"Today {today_precip}% / Tonight {tonight_precip}%",
+                normalize_text(forecast.get("today_forecast", "")).upper() or conditions.upper(),
+            ],
+        })
+
+    # Thunderstorm regime — from NWS forecast text
+    has_tstorms = forecast.get("has_thunderstorms", False)
+    if has_tstorms and max_precip < 90:
+        tstorm_precip = safe_int(forecast.get("today_precip_chance"))
+        regimes.append({
+            "id": "thunderstorm",
+            "label": "Thunderstorms",
+            "score": 0.88,
+            "headline": "T-STORMS POSSIBLE",
+            "action": "WATCH THE SKY",
+            "notes": [
+                f"Precip {tstorm_precip}%",
+                normalize_text(forecast.get("today_forecast", "")).upper() or "THUNDERSTORMS POSSIBLE",
+            ],
+        })
+
     if high >= 86:
         regimes.append({
             "id": "heat",
@@ -410,7 +456,7 @@ def build_regimes(parsed: dict, planting_week: dict, pollen_week: dict, school_e
 
 
 def build_board(primary_story: dict, active_stack: list[dict], planting_week: dict, pollen_info: dict, school_event: dict | None, style: dict):
-    compact = style.get("alert_readability_bias") or any(item["id"] == "pollen" for item in active_stack)
+    compact = style.get("alert_readability_bias") or any(item["id"] in {"pollen", "heavy_rain", "thunderstorm", "storm"} for item in active_stack)
 
     direct_sow = planting_week.get("direct_sow", []) or []
     transplant = planting_week.get("transplant", []) or []
@@ -518,6 +564,8 @@ def build_scene_description(backdrop: str, active_stack: list[dict], style: dict
 
     motifs = {
         "storm": "storm arrows, dramatic cloud masses, alert triangles, and weather-front energy",
+        "heavy_rain": "heavy rain streaks, umbrellas, puddles, dark cloud layers, and wet vegetation",
+        "thunderstorm": "lightning bolts, dark thunderheads, dramatic sky, rain curtains, and storm clouds",
         "frost": "row covers, cold glitter on garden beds, warning pennants, and low-lying frost pockets",
         "ski": "chairlifts, groomed trails, skiers, pine ridges, and ski hill geometry",
         "sap": "sugar maples, sap buckets, tubing lines, sugar-house steam, and melting snow patches",
