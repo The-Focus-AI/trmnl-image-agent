@@ -133,7 +133,9 @@ Extract and return this exact JSON structure (NO markdown code blocks, just raw 
     "tonight_forecast": "<tonight's short forecast>",
     "has_thunderstorms": <true if today's or tonight's forecast mentions thunder or storms, false otherwise>,
     "tomorrow_precip_chance": <tomorrow's max precip probability or 0>,
-    "tomorrow_forecast": "<tomorrow's short forecast>"
+    "tomorrow_forecast": "<tomorrow's short forecast>",
+    "weekend_forecast": "<Saturday/Sunday highlight like: RAIN BOTH DAYS or SUNNY 75° or SAT RAIN SUN CLEAR>",
+    "weekend_precip_chance": <highest precip % across Sat+Sun periods, e.g. 100, or null if not available>
   }}
 }}
 
@@ -146,7 +148,8 @@ IMPORTANT RULES:
 6. For mohawk status: set to "closed" if the page says closed for season, no trails open, or similar. Set to "open" if skiing appears active.
 7. If mohawk is closed AND sap is flowing, set banner type to "sap_flowing" with text like "🍁 SAP IS FLOWING • HIGH <high>° LOW <low>° 🍁"
 8. For forecast: extract the short forecast text and precipitation probability from the NWS Gridpoint JSON periods. Today's period (usually named "Today" or "This Afternoon") has today_precip_chance and today_forecast. Tonight's period has tonight_precip_chance and tonight_forecast. Tomorrow's period has tomorrow_precip_chance and tomorrow_forecast. If a period name matches "Wednesday" or similar, use the next daytime period. has_thunderstorms should be true if any of today's/tonight's forecast text contains keywords like thunderstorm, thunder, storms, t-storms.
-9. Return ONLY the JSON object, no markdown code blocks, no backticks
+9. For weekend_forecast: look at the Saturday and Sunday periods in the forecast. Write a short 2-3 word highlight summarizing the weekend weather — e.g. "RAIN BOTH DAYS", "SAT RAIN SUN CLEAR", "SUNNY 75°", "MIXED BAG", "CLEAR AND WARM". weekend_precip_chance is the highest precipitation % across Saturday and Sunday daytime periods (e.g. 100 if Saturday says 100%, null if weekend data isn't available).
+10. Return ONLY the JSON object, no markdown code blocks, no backticks
 """
 
     print(prompt)

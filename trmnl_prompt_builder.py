@@ -452,10 +452,10 @@ def build_regimes(parsed: dict, planting_week: dict, pollen_week: dict, school_e
         "weed": weed,
         "dominant": pollen_week.get("dominant", []) or [],
         "summary": normalize_text(pollen_week.get("summary")),
-    }
+    }, forecast
 
 
-def build_board(primary_story: dict, active_stack: list[dict], planting_week: dict, pollen_info: dict, school_event: dict | None, style: dict):
+def build_board(primary_story: dict, active_stack: list[dict], planting_week: dict, pollen_info: dict, school_event: dict | None, style: dict, forecast: dict | None = None, now: dt.date | None = None):
     compact = style.get("alert_readability_bias") or any(item["id"] in {"pollen", "heavy_rain", "thunderstorm", "storm"} for item in active_stack)
 
     direct_sow = planting_week.get("direct_sow", []) or []
@@ -483,7 +483,13 @@ def build_board(primary_story: dict, active_stack: list[dict], planting_week: di
             lines.append(primary_story["action"])
         else:
             lines.append(primary_story["action"])
-            if pollen_info.get("tree", "none") != "none":
+            weather_story = primary_story.get("id") in {"heavy_rain", "thunderstorm", "storm"}
+            if weather_story:
+                notes = primary_story.get("notes", [])
+                for note in notes[:2]:
+                    if note:
+                        lines.append(note.upper())
+            elif pollen_info.get("tree", "none") != "none":
                 lines.append(f"TREE POLLEN {pollen_level_label(pollen_info.get('tree', 'none'))}")
             elif harvest:
                 lines.append(f"HARVEST: {', '.join(harvest[:2]).upper()}")
@@ -493,7 +499,7 @@ def build_board(primary_story: dict, active_stack: list[dict], planting_week: di
                 lines.append(f"SOW: {', '.join(direct_sow[:2]).upper()}")
             elif tasks:
                 lines.append(f"TASK: {tasks[0].upper()}")
-            if dominant:
+            if not weather_story and dominant:
                 lines.append(f"WORST: {' • '.join(dominant[:3])}")
     else:
         title = "TODAY"
@@ -520,13 +526,27 @@ def build_board(primary_story: dict, active_stack: list[dict], planting_week: di
         if dominant:
             lines.append(f"Worst: {' • '.join(dominant[:3])}")
 
+    # Weekend outlook — show on Thursday and Friday (weekday 3 and 4)
+    if now is not None and now.weekday() in {3, 4}:  # Thu or Fri only
+        fc = forecast or {}
+        wknd = normalize_text(fc.get("weekend_forecast"))
+        wknd_precip = safe_int(fc.get("weekend_precip_chance"))
+        if wknd and wknd_precip is not None:
+            wknd_line = f"WEEKEND: {wknd} ({wknd_precip}%)"
+            if compact:
+                # Insert after the second line (headline + action), replacing any tertiary line
+                insert_pos = min(2, len(lines) - 1)
+                lines.insert(insert_pos, wknd_line)
+            elif len(lines) < 6:
+                lines.append(wknd_line)
+
     if school_event and not compact:
         lines.append(school_event["text"].upper())
 
     return {
         "title": title,
         "subtitle": "" if compact else f"{style['name']} • {style['week_label']}",
-        "lines": lines[:4] if compact else lines[:6],
+        "lines": lines[:5] if compact else lines[:6],
     }
 
 
@@ -541,6 +561,8 @@ def determine_banner(primary_story: dict, active_stack: list[dict], school_event
         text = f"{primary_story['headline']} • {primary_story['action']}"
     elif primary_story["id"] == "pollen":
         text = primary_story["action"]
+    elif primary_story["id"] in {"heavy_rain", "thunderstorm"}:
+        text = f"{primary_story['headline']} • {primary_story['action']}"
 
     if school_event and primary_story["id"] != "school":
         text = f"{text} • {school_event['text'].upper()}"
@@ -597,7 +619,7 @@ def build_dashboard_state(parsed: dict, planting: dict, pollen: dict, school: di
     pollen_week = pollen.get(week_key, {})
     school_event = find_school_event(school, now)
     backdrop = compute_backdrop(parsed, now)
-    active_stack, pollen_info = build_regimes(parsed, planting_week, pollen_week, school_event, now)
+    active_stack, pollen_info, _forecast = build_regimes(parsed, planting_week, pollen_week, school_event, now)
     if not active_stack:
         active_stack = [{
             "id": "background",
@@ -609,7 +631,7 @@ def build_dashboard_state(parsed: dict, planting: dict, pollen: dict, school: di
         }]
     primary_story = active_stack[0]
     style = compute_style_of_week(now, backdrop, primary_story["id"])
-    board = build_board(primary_story, active_stack, planting_week, pollen_info, school_event, style)
+    board = build_board(primary_story, active_stack, planting_week, pollen_info, school_event, style, forecast=parsed.get("forecast", {}), now=now)
     action_line = primary_story["action"]
     banner_text = determine_banner(primary_story, active_stack, school_event, planting_week, pollen_info)
 
@@ -709,7 +731,7 @@ LEFT SIDE - a single simple town signpost with EXACTLY four stacked weather sign
 - '{temp}° {conditions}'
 - 'H {high}° / L {low}°'
 - '{wind.upper()}'{extra_left_text}{moon_strip}
-RIGHT SIDE - {style['board_material']} titled '{board['title']}' showing; treat this as a bold summary board with EXACTLY these four lines in this order, one line per row, and no extra rows or paraphrases. No stack jargon, no repeated pollen line, no tiny explanatory labels, generous padding, and heavy lettering. The right panel must stay fully inside frame with comfortable margins and no cropped side content:
+RIGHT SIDE - {style['board_material']} titled '{board['title']}' showing; treat this as a bold summary board with EXACTLY these {len(board['lines'])} lines in this order, one line per row, and no extra rows or paraphrases. No stack jargon, no repeated pollen line, no tiny explanatory labels, generous padding, and heavy lettering. The right panel must stay fully inside frame with comfortable margins and no cropped side content:
 {board_lines}
 
 BOTTOM CENTER - use a simple solid headline bar with '{state['banner_text']}'. Prefer a plain bold bar over an ornate ribbon, and do not repeat the exact same pollen message in both the bar and the right panel.
