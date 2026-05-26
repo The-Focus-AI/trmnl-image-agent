@@ -10,6 +10,6 @@ NWS_URL="https://forecast.weather.gov/MapClick.php?lat=41.8456&lon=-73.3284"
 
 mkdir -p "$OUTPUT_DIR"
 
-curl -sL "$NWS_URL" > "$OUTPUT_FILE"
+curl -sL --compressed "$NWS_URL" > "$OUTPUT_FILE"
 
 echo "$OUTPUT_FILE"
