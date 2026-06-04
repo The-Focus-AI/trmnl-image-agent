@@ -1,0 +1,27 @@
+{
+  "_meta": {
+    "year": 2026,
+    "source": "https://cornwallct.org/community/coming-events/",
+    "notes": "Cornwall CT town events calendar. Tier: 3=major community event, 2=notable fun event, 1=recurring/mild interest, 0=government meeting (don't show on TRMNL)",
+    "last_fetched": "2026-06-04"
+  },
+  "events": [
+    {"date": "2026-06-06", "tier": 3, "label": "MILITIA DAYS", "description": "Revolutionary War reenactment on the Town Green", "time": "Sat 10AM-9PM"},
+    {"date": "2026-06-07", "tier": 3, "label": "MILITIA DAYS", "description": "Day 2 — encampment continues", "time": "Sun 9AM-1:30PM"},
+    {"date": "2026-06-07", "tier": 2, "label": "MUTT SHOW @ LIME ROCK", "description": "Little Guild's Annual Great Country Mutt Show", "time": "11AM-2:30PM"},
+    {"date": "2026-06-10", "tier": 1, "label": "SENIOR LUNCH", "description": "Community/Senior Lunch @ UCC Parish House", "time": "12-1PM"},
+    {"date": "2026-06-10", "tier": 1, "label": "TEA WITH HONEY", "description": "Chinese tea ceremony @ Cornwall Market", "time": "4-6PM"},
+    {"date": "2026-06-12", "tier": 2, "label": "DAD & KID BUILD DAY", "description": "Father & Child Build & Paint wooden race car @ Town Hall", "time": "5-6PM"},
+    {"date": "2026-06-13", "tier": 2, "label": "OPEN HOUSE HIKE", "description": "Hike the Matland Preserve (CT Open House Day)", "time": "10-11:30AM"},
+    {"date": "2026-06-17", "tier": 1, "label": "SOCIAL HOUR", "description": "Community Social Hour @ UCC Parish House", "time": "2-3PM"},
+    {"date": "2026-06-19", "tier": 3, "label": "BOOKS & BLOOMS", "description": "Talk & Cocktail Reception with Jonathan Galassi @ Library", "time": "5-7PM"},
+    {"date": "2026-06-20", "tier": 2, "label": "CORNWALL MUSIC BOWL", "description": "All-day music @ Cornwall Market", "time": "All day"},
+    {"date": "2026-06-20", "tier": 0, "label": "HAZ WASTE DAY", "description": "Household Hazardous Waste @ Falls Village Garage", "time": "9AM-12PM"},
+    {"date": "2026-06-25", "tier": 2, "label": "SUMMER READING KICKOFF", "description": "Summer Reading Program Kickoff @ Library", "time": "TBD"},
+    {"date": "2026-07-04", "tier": 3, "label": "AMERICA 250 PARADE", "description": "America's 250th Anniversary Parade in Cornwall Village", "time": "All day"}
+  ],
+  "recurring": [
+    {"day_of_week": 6, "label": "FARMERS MARKET", "description": "Cornwall COOP Farm Market on Pine Street", "time": "9AM-12PM", "tier": 1},
+    {"day_of_week": 4, "label": "STORYBOOK HOUR", "description": "Storybook Hour with Rita Delgado @ Library", "time": "10:30AM-12PM", "tier": 1}
+  ]
+}

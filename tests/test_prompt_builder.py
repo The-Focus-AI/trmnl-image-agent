@@ -48,8 +48,9 @@ class DashboardStateTests(unittest.TestCase):
             }
         }
         school = {"events": []}
+        town = {"events": [], "recurring": []}
 
-        state = build_dashboard_state(parsed, planting, pollen, school, now=dt.date(2026, 3, 22))
+        state = build_dashboard_state(parsed, planting, pollen, school, town, now=dt.date(2026, 3, 22))
 
         self.assertEqual(state["primary_story"]["id"], "frost")
         self.assertIn("sap", [item["id"] for item in state["active_stack"]])
@@ -89,7 +90,7 @@ class DashboardStateTests(unittest.TestCase):
         }
         school = {"events": []}
 
-        state = build_dashboard_state(parsed, planting, pollen, school, now=dt.date(2026, 4, 30))
+        state = build_dashboard_state(parsed, planting, pollen, school, {"events": [], "recurring": []}, now=dt.date(2026, 4, 30))
         scene = build_scene_description(state["backdrop"], state["active_stack"], state["style"], state["pollen"], state["planting_week"], dt.date(2026, 4, 30))
         prompt = render_prompt(parsed, state)
         board = build_board(state["primary_story"], state["active_stack"], state["planting_week"], state["pollen"], state["school_event"], state["style"])
@@ -116,7 +117,7 @@ class DashboardStateTests(unittest.TestCase):
         self.assertIn("Do not put species names under the specimen studies", prompt)
         self.assertIn("oversized date and weather numerals", prompt)
         self.assertIn("No fifth box, no repeated wind box, no tiny sublabels", prompt)
-        self.assertIn("treat this as a bold summary board with EXACTLY these four lines in this order", prompt)
+        self.assertIn("treat this as a bold summary board with EXACTLY these 2 lines in this order", prompt)
         self.assertIn("No stack jargon", prompt)
         self.assertIn("do not repeat the exact same pollen message", prompt)
         self.assertIn("If the layout gets crowded, delete nonessential metadata before shrinking primary data", prompt)
@@ -131,16 +132,12 @@ class DashboardStateTests(unittest.TestCase):
         self.assertEqual(board["subtitle"], "")
         self.assertLessEqual(len(board["lines"]), 4)
         self.assertEqual(board["lines"][0], "TREE POLLEN VERY HIGH")
-        self.assertTrue(board["lines"][1].startswith("WORST: "))
-        self.assertIn("OAK", board["lines"][1])
-        self.assertIn("BIRCH", board["lines"][1])
-        self.assertIn("PINE", board["lines"][1])
-        self.assertTrue(board["lines"][2].startswith(("TRANSPLANT: ", "SOW: ")))
-        self.assertNotIn("HARVEST:", board["lines"][2])
-        self.assertEqual(board["lines"][3], "LIMIT TREE POLLEN EXPOSURE")
+        # The compact mode shows secondary lines: growing/harvest info first
+        self.assertIn("HARVEST: SPINACH, RADISHES", board["lines"][1])
         self.assertEqual(state["banner_text"], "LIMIT TREE POLLEN EXPOSURE")
 
-    def test_pollen_secondary_still_forces_botanical_truth_mode(self):
+    def test_pollen_secondary_still_forces_botanical_detail(self):
+        """Pollen secondary still adds botanical detail to scene, but not the full-screen truth mode takeover."""
         parsed = {
             "date": "THU 30 APR",
             "timestamp": "6:01 PM",
@@ -173,12 +170,15 @@ class DashboardStateTests(unittest.TestCase):
         }
         school = {"events": []}
 
-        state = build_dashboard_state(parsed, planting, pollen, school, now=dt.date(2026, 4, 30))
+        state = build_dashboard_state(parsed, planting, pollen, school, {"events": [], "recurring": []}, now=dt.date(2026, 4, 30))
         self.assertEqual(state["primary_story"]["id"], "frost")
         self.assertIn("pollen", [item["id"] for item in state["active_stack"]])
         prompt = render_prompt(parsed, state)
-        self.assertIn("BOTANICAL TRUTH MODE", prompt)
-        self.assertIn("botanical pollen bulletin board for Cornwall rather than a scenic poster", prompt)
+        self.assertNotIn("BOTANICAL TRUTH MODE", prompt)
+        self.assertNotIn("botanical pollen bulletin board for Cornwall rather than a scenic poster", prompt)
+        # But botanical detail is still in the scene description
+        self.assertIn("botanically accurate pollen-season cues", prompt)
+        self.assertIn("oak should read as a real local Connecticut oak", prompt)
 
     def test_full_moon_phase_is_optional_but_allowed(self):
         parsed = {
@@ -196,7 +196,7 @@ class DashboardStateTests(unittest.TestCase):
         pollen = {"04-27": {"tree": "moderate", "grass": "none", "weed": "none", "dominant": ["oak"], "summary": "tree pollen present"}}
         school = {"events": []}
 
-        state = build_dashboard_state(parsed, planting, pollen, school, now=dt.date(2026, 4, 30))
+        state = build_dashboard_state(parsed, planting, pollen, school, {"events": [], "recurring": []}, now=dt.date(2026, 4, 30))
         prompt = render_prompt(parsed, state)
         self.assertIn("FULL MOON", prompt)
 
@@ -233,7 +233,7 @@ class DashboardStateTests(unittest.TestCase):
         }
         school = {"events": [{"date": "2026-10-05", "type": "early_dismissal", "description": "Regional PD"}]}
 
-        state = build_dashboard_state(parsed, planting, pollen, school, now=dt.date(2026, 10, 3))
+        state = build_dashboard_state(parsed, planting, pollen, school, {"events": [], "recurring": []}, now=dt.date(2026, 10, 3))
 
         self.assertEqual(state["primary_story"]["id"], "harvest")
         self.assertIn("school", [item["id"] for item in state["active_stack"]])

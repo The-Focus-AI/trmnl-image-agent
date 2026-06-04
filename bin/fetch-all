@@ -38,6 +38,10 @@ fi
 "$SCRIPT_DIR/fetch-sun-moon" > "$OUTPUT_DIR/sun-moon.json" &
 PID_SUN=$!
 
+# Town events — static calendar copied to output dir
+"$SCRIPT_DIR/fetch-town-events" > /dev/null &
+PID_EVENTS=$!
+
 # Wait for all to complete
 wait $PID_WEATHER
 wait $PID_FORECAST
@@ -45,11 +49,13 @@ if [ "$MOHAWK_OFF_SEASON" = "false" ]; then
   wait $PID_MOHAWK
 fi
 wait $PID_SUN
+wait $PID_EVENTS
 
 echo "Raw data fetched:" >&2
 echo "  - $OUTPUT_DIR/weather.html" >&2
 echo "  - $OUTPUT_DIR/forecast.json" >&2
-echo "  - $OUTPUT_DIR/mohawk.txt$([ "$MOHAWK_OFF_SEASON" = "true" ] && echo " (off-season placeholder)")" >&2
+echo "  - $OUTPUT_DIR/mohawk.txt$([ "$MOHAWK_OFF_SEASON" = "true" ] && echo " (off-season placeholder)" )" >&2
 echo "  - $OUTPUT_DIR/sun-moon.json" >&2
+echo "  - $OUTPUT_DIR/town-events.json" >&2
 
 echo "$OUTPUT_DIR"

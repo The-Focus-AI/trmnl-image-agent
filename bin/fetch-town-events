@@ -1,0 +1,14 @@
+#!/bin/bash
+# Fetch Cornwall CT town events — reads static JSON and outputs the event feed
+# For now this copies the static calendar; could be enhanced to scrape cornwallct.org
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROMPTS_DIR="$(cd "$SCRIPT_DIR/../prompts" && pwd)"
+OUTPUT_DIR="${1:-/tmp/trmnl-data}"
+
+# Copy the static events calendar (source of truth)
+cp "$PROMPTS_DIR/cornwall-events-2026.json" "$OUTPUT_DIR/town-events.json"
+
+# Output the path for logging
+echo "$OUTPUT_DIR/town-events.json"

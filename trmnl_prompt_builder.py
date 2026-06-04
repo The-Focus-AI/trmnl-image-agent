@@ -229,7 +229,77 @@ def find_school_event(school: dict, now: dt.date):
     return None
 
 
-def build_regimes(parsed: dict, planting_week: dict, pollen_week: dict, school_event: dict | None, now: dt.date):
+def find_school_last_day(school: dict, now: dt.date):
+    """Find the last day of school and days remaining."""
+    last_day = None
+    for event in school.get("events", []):
+        if event.get("type") == "early_dismissal" and "Last Day" in (event.get("description", "") or ""):
+            d = dt.date.fromisoformat(event["date"])
+            if d >= now:
+                last_day = d
+                break
+    if not last_day:
+        return None
+    days_left = (last_day - now).days
+    return {
+        "date": last_day,
+        "days_left": days_left,
+        "is_today": days_left == 0,
+    }
+
+
+def find_upcoming_events(town: dict, now: dt.date, max_days: int = 21):
+    """Find the best upcoming town events within max_days, sorted by tier then proximity."""
+    events = town.get("events", [])
+    recurring = town.get("recurring", [])
+    candidates = []
+
+    for event in events:
+        try:
+            d = dt.date.fromisoformat(event["date"])
+        except (ValueError, TypeError):
+            continue
+        days_off = (d - now).days
+        if 0 <= days_off <= max_days:
+            tier = event.get("tier", 1)
+            candidates.append({
+                "date": d,
+                "days_off": days_off,
+                "label": event.get("label", ""),
+                "description": event.get("description", ""),
+                "time": event.get("time", ""),
+                "tier": tier,
+            })
+
+    # Also check recurring events (farmers market, storybook hour)
+    today_weekday = now.weekday()
+    for item in recurring:
+        dow = item.get("day_of_week")
+        if dow is not None:
+            # Find next occurrence within max_days
+            days_ahead = (dow - today_weekday) % 7
+            if days_ahead == 0:
+                days_ahead = 7  # Next week, not today
+            if days_ahead <= max_days:
+                d = now + dt.timedelta(days=days_ahead)
+                candidates.append({
+                    "date": d,
+                    "days_off": days_ahead,
+                    "label": item.get("label", ""),
+                    "description": item.get("description", ""),
+                    "time": item.get("time", ""),
+                    "tier": 1,
+                })
+
+    if not candidates:
+        return None
+
+    # Sort: highest tier first, then closest
+    candidates.sort(key=lambda x: (-x["tier"], x["days_off"]))
+    return candidates[0]
+
+
+def build_regimes(parsed: dict, planting_week: dict, pollen_week: dict, school_event: dict | None, now: dt.date, town_event: dict | None = None, school_last_day: dict | None = None):
     weather = parsed.get("weather", {})
     alerts = parsed.get("alerts", {})
     mohawk = parsed.get("mohawk", {})
@@ -440,6 +510,86 @@ def build_regimes(parsed: dict, planting_week: dict, pollen_week: dict, school_e
             "notes": [conditions.upper(), f"Low {low}° tonight"],
         })
 
+    # Town events regime — surfaces the best upcoming community event
+    if town_event:
+        tier = town_event.get("tier", 1)
+        days_off = town_event.get("days_off", 0)
+        label = town_event.get("label", "")
+        description = town_event.get("description", "")
+        time_str = town_event.get("time", "")
+
+        # Score based on tier and proximity
+        if tier >= 3:
+            if days_off <= 2:
+                score = 0.92  # Major event this weekend / tomorrow!
+            elif days_off <= 7:
+                score = 0.86  # Major event this week
+            else:
+                score = 0.78  # Major event upcoming
+        elif tier == 2:
+            if days_off <= 2:
+                score = 0.82  # Fun event this weekend
+            elif days_off <= 7:
+                score = 0.72  # Fun event this week
+            else:
+                score = 0.65  # Fun event upcoming
+        else:
+            score = 0.50  # Recurring / mild
+
+        if days_off == 0:
+            # Event is today!
+            headline = f"TODAY: {label}"
+            action = "GO CHECK IT OUT"
+        elif days_off == 1:
+            headline = f"TOMORROW: {label}"
+            action = "PLAN AHEAD"
+        else:
+            day_name = (now + dt.timedelta(days=days_off)).strftime("%a").upper()
+            headline = f"{label} {day_name}"
+            action = "MARK YOUR CALENDAR"
+
+        notes_parts = []
+        if description:
+            notes_parts.append(description.upper())
+        if time_str and time_str.lower() != "tbd" and time_str.lower() != "all day":
+            notes_parts.append(time_str)
+        elif days_off <= 7:
+            notes_parts.append(f"{days_off} DAYS AWAY")
+
+        regimes.append({
+            "id": "town_events",
+            "label": "Town Events",
+            "score": score,
+            "headline": headline,
+            "action": action,
+            "notes": notes_parts[:2],
+            "town_event": town_event,
+        })
+
+    # School countdown regime — ramps up as summer approaches
+    if school_last_day:
+        days_left = school_last_day["days_left"]
+        if days_left <= 0:
+            # School's out!
+            regimes.append({
+                "id": "school_out",
+                "label": "School Out",
+                "score": 0.95,
+                "headline": "SCHOOL'S OUT FOR SUMMER!",
+                "action": "ENJOY THE FREEDOM",
+                "notes": ["SUMMER VACATION!", "LAST DAY OF SCHOOL"],
+            })
+        elif days_left <= 14:
+            score = 0.78 + (14 - days_left) * 0.01  # ramps from 0.78 to 0.92
+            regimes.append({
+                "id": "school_countdown",
+                "label": "Summer Countdown",
+                "score": round(score, 2),
+                "headline": f"{days_left} DAYS 'TIL SUMMER",
+                "action": "ALMOST THERE" if days_left > 3 else "SO CLOSE!",
+                "notes": [f"Last day: {school_last_day['date'].strftime('%b %d').upper()}", "SCHOOL'S OUT JUN 19"],
+            })
+
     deduped = []
     seen = set()
     for regime in sorted(regimes, key=lambda item: item["score"], reverse=True):
@@ -456,6 +606,7 @@ def build_regimes(parsed: dict, planting_week: dict, pollen_week: dict, school_e
 
 
 def build_board(primary_story: dict, active_stack: list[dict], planting_week: dict, pollen_info: dict, school_event: dict | None, style: dict, forecast: dict | None = None, now: dt.date | None = None):
+    primary_id = primary_story.get("id", "")
     compact = style.get("alert_readability_bias") or any(item["id"] in {"pollen", "heavy_rain", "thunderstorm", "storm"} for item in active_stack)
 
     direct_sow = planting_week.get("direct_sow", []) or []
@@ -464,67 +615,90 @@ def build_board(primary_story: dict, active_stack: list[dict], planting_week: di
     tasks = planting_week.get("tasks", []) or []
     dominant = [normalize_text(item).upper() for item in (pollen_info.get("dominant", []) or []) if normalize_text(item)]
 
-    if compact:
-        title = "TODAY"
-        lines = [
-            primary_story["headline"],
-        ]
-        if primary_story.get("id") == "pollen":
+    # Build secondary lines based on active stack (not just primary)
+    def _secondary_lines():
+        lines = []
+
+        # If primary is town_events, show event description + time
+        if primary_id == "town_events":
+            notes = primary_story.get("notes", [])
+            for note in notes[:2]:
+                if note:
+                    lines.append(note.upper())
+
+        # If primary is school_countdown / school_out
+        elif primary_id in ("school_countdown", "school_out"):
+            pass  # Just show the headline + action, no clutter
+
+        # Weather stories get notes
+        elif primary_id in {"heavy_rain", "thunderstorm", "storm", "frost", "heat"}:
+            notes = primary_story.get("notes", [])
+            for note in notes[:2]:
+                if note:
+                    lines.append(note.upper())
+
+        # Always add a secondary line about the next-best thing
+        # Check for other active stack items that aren't the primary
+        secondary_items = [item for item in active_stack if item["id"] != primary_id and item["id"] not in {"background", "school_countdown", "school_out"}]
+
+        # Look for garden/pollen info as a secondary
+        if any(item["id"] == "pollen" for item in secondary_items):
             if dominant:
-                lines.append(f"WORST: {' • '.join(dominant[:3])}")
+                lines.append(f"POLLEN: {' • '.join(dominant[:2])}")
+            elif pollen_info.get("tree", "none") != "none" or pollen_info.get("grass", "none") != "none":
+                bits = []
+                for name in ["tree", "grass", "weed"]:
+                    level = pollen_info.get(name, "none")
+                    if level != "none":
+                        bits.append(f"{pollen_level_label(level)} {name.title()}")
+                if bits:
+                    lines.append("POLLEN: " + " / ".join(bits[:2]))
+
+        if any(item["id"] == "planting" for item in secondary_items):
             if transplant:
                 lines.append(f"TRANSPLANT: {', '.join(transplant[:2]).upper()}")
             elif direct_sow:
                 lines.append(f"SOW: {', '.join(direct_sow[:2]).upper()}")
             elif harvest:
                 lines.append(f"HARVEST: {', '.join(harvest[:2]).upper()}")
-            elif tasks:
-                lines.append(f"TASK: {tasks[0].upper()}")
-            lines.append(primary_story["action"])
-        else:
-            lines.append(primary_story["action"])
-            weather_story = primary_story.get("id") in {"heavy_rain", "thunderstorm", "storm"}
-            if weather_story:
-                notes = primary_story.get("notes", [])
-                for note in notes[:2]:
-                    if note:
-                        lines.append(note.upper())
-            elif pollen_info.get("tree", "none") != "none":
-                lines.append(f"TREE POLLEN {pollen_level_label(pollen_info.get('tree', 'none'))}")
-            elif harvest:
+
+        if any(item["id"] == "harvest" for item in secondary_items):
+            if harvest and not any("HARVEST" in l for l in lines):
                 lines.append(f"HARVEST: {', '.join(harvest[:2]).upper()}")
-            elif transplant:
-                lines.append(f"TRANSPLANT: {', '.join(transplant[:2]).upper()}")
-            elif direct_sow:
-                lines.append(f"SOW: {', '.join(direct_sow[:2]).upper()}")
-            elif tasks:
-                lines.append(f"TASK: {tasks[0].upper()}")
-            if not weather_story and dominant:
-                lines.append(f"WORST: {' • '.join(dominant[:3])}")
+
+        # Check for school countdown in secondary
+        school_cd = next((item for item in active_stack if item["id"] == "school_countdown"), None)
+        if school_cd and primary_id != "school_countdown":
+            lines.append(school_cd["headline"])
+
+        school_out = next((item for item in active_stack if item["id"] == "school_out"), None)
+        if school_out and primary_id != "school_out":
+            lines.append(school_out["headline"])
+
+        # Town events in secondary? Mention the best one
+        town_ev = next((item for item in active_stack if item["id"] == "town_events"), None)
+        if town_ev and primary_id != "town_events":
+            lines.append(town_ev["headline"])
+
+        # School event (early dismissal etc.) in secondary
+        if school_event and primary_id != "school":
+            lines.append(school_event["text"].upper())
+
+        return lines
+
+    if compact:
+        title = "TODAY"
+        lines = [primary_story["headline"]]
+        sec = _secondary_lines()
+        lines.extend(sec[:4])  # max 4 secondary lines in compact
+        # Ensure we have at least the action line
+        if len(lines) < 2:
+            lines.append(primary_story["action"])
     else:
         title = "TODAY"
-        lines = [
-            primary_story["headline"],
-            primary_story["action"],
-        ]
-        if harvest:
-            lines.append(f"HARVEST: {', '.join(harvest[:3])}")
-        elif transplant:
-            lines.append(f"TRANSPLANT: {', '.join(transplant[:3])}")
-        elif direct_sow:
-            lines.append(f"SOW: {', '.join(direct_sow[:3])}")
-        elif tasks:
-            lines.append(f"TASK: {tasks[0]}")
-
-        pollen_bits = []
-        for name in ["tree", "grass", "weed"]:
-            level = pollen_info.get(name, "none")
-            if level != "none":
-                pollen_bits.append(f"{name.title()} {pollen_level_label(level)}")
-        if pollen_bits:
-            lines.append(" / ".join(pollen_bits))
-        if dominant:
-            lines.append(f"Worst: {' • '.join(dominant[:3])}")
+        lines = [primary_story["headline"], primary_story["action"]]
+        sec = _secondary_lines()
+        lines.extend(sec[:4])  # max 4 secondary in non-compact
 
     # Weekend outlook — show on Thursday and Friday (weekday 3 and 4)
     if now is not None and now.weekday() in {3, 4}:  # Thu or Fri only
@@ -534,14 +708,10 @@ def build_board(primary_story: dict, active_stack: list[dict], planting_week: di
         if wknd and wknd_precip is not None:
             wknd_line = f"WEEKEND: {wknd} ({wknd_precip}%)"
             if compact:
-                # Insert after the second line (headline + action), replacing any tertiary line
                 insert_pos = min(2, len(lines) - 1)
                 lines.insert(insert_pos, wknd_line)
             elif len(lines) < 6:
                 lines.append(wknd_line)
-
-    if school_event and not compact:
-        lines.append(school_event["text"].upper())
 
     return {
         "title": title,
@@ -563,8 +733,14 @@ def determine_banner(primary_story: dict, active_stack: list[dict], school_event
         text = primary_story["action"]
     elif primary_story["id"] in {"heavy_rain", "thunderstorm"}:
         text = f"{primary_story['headline']} • {primary_story['action']}"
+    elif primary_story["id"] == "town_events":
+        text = f"{primary_story['headline']} • {primary_story['action']}"
+    elif primary_story["id"] == "school_countdown":
+        text = f"{primary_story['headline']} • JUN 19"
+    elif primary_story["id"] == "school_out":
+        text = "SUMMER VACATION! ☀️"
 
-    if school_event and primary_story["id"] != "school":
+    if school_event and primary_story["id"] not in ("school", "school_countdown", "school_out"):
         text = f"{text} • {school_event['text'].upper()}"
     return text[:120]
 
@@ -596,6 +772,9 @@ def build_scene_description(backdrop: str, active_stack: list[dict], style: dict
         "pollen": describe_pollen_motif({"dominant": pollen_context.get("dominant", [])}),
         "school": "a town bulletin board or calendar notice tucked into the civic landscape",
         "heat": "sun glyphs, deep shadows, wilt warning energy, and water vessels at hand",
+        "town_events": "a community events poster with pennants, a town green, festival tents, market stalls, and people gathering",
+        "school_countdown": "a calendar counting down the days, summer sunshine peeking over the horizon, chalkboard with crossed-off dates",
+        "school_out": "bursting summer celebration with sunshine, open fields, bikes, swim holes, and a carefree vacation atmosphere",
     }
     active_ids = [item["id"] for item in active_stack[:3]]
     active_motifs = [motifs[item_id] for item_id in active_ids if item_id in motifs]
@@ -612,14 +791,16 @@ def build_scene_description(backdrop: str, active_stack: list[dict], style: dict
     return f"{backdrop_text}; include overlapping active realities: {motif_text}.{extra_directive} The composition should feel like a local Cornwall bulletin board imagined through the weekly guest art director style {style['name']}. Prefer botanical accuracy over decorative symbolism."
 
 
-def build_dashboard_state(parsed: dict, planting: dict, pollen: dict, school: dict, now: dt.date | None = None):
+def build_dashboard_state(parsed: dict, planting: dict, pollen: dict, school: dict, town: dict, now: dt.date | None = None):
     now = now or current_et_date()
     week_key = monday_key(now)
     planting_week = planting.get(week_key, {})
     pollen_week = pollen.get(week_key, {})
     school_event = find_school_event(school, now)
+    school_last_day = find_school_last_day(school, now)
+    town_event = find_upcoming_events(town, now)
     backdrop = compute_backdrop(parsed, now)
-    active_stack, pollen_info, _forecast = build_regimes(parsed, planting_week, pollen_week, school_event, now)
+    active_stack, pollen_info, _forecast = build_regimes(parsed, planting_week, pollen_week, school_event, now, town_event, school_last_day)
     if not active_stack:
         active_stack = [{
             "id": "background",
@@ -688,8 +869,9 @@ def render_prompt(parsed: dict, state: dict) -> str:
         state.get('planting_week'),
         dt.date.fromisoformat(state['date']),
     )
-    pollen_active = any(item["id"] == "pollen" for item in state["active_stack"])
-    if pollen_active:
+    primary_id = state['primary_story']['id']
+    pollen_is_primary = primary_id == "pollen"
+    if pollen_is_primary:
         scene_text = (
             "botanical pollen bulletin board for Cornwall rather than a scenic poster; "
             "the dominant visual should be three large specimen studies occupying most of the composition: oak, birch, and pine; "
@@ -697,7 +879,6 @@ def render_prompt(parsed: dict, state: dict) -> str:
             "use only a narrow secondary landscape band or small vignette to situate the weather, garden beds, stone walls, frost cloth, and modest spring harvest cues"
         )
         pollen_truth_block = """
-
 BOTANICAL TRUTH MODE:
 - This is not a decorative spring landscape.
 - Make the composition a botanical bulletin board first and a landscape second.
@@ -766,13 +947,15 @@ def main():
     parser.add_argument("--planting", default=str(Path(__file__).resolve().parent / "prompts/planting-calendar-zone6a.json"))
     parser.add_argument("--pollen", default=str(Path(__file__).resolve().parent / "prompts/pollen-calendar-zone6a.json"))
     parser.add_argument("--school", default=str(Path(__file__).resolve().parent / "prompts/school-calendar.json"))
+    parser.add_argument("--town", default=str(Path(__file__).resolve().parent / "prompts/cornwall-events-2026.json"))
     args = parser.parse_args()
 
     parsed = load_json(Path(args.input))
     planting = load_json(Path(args.planting))
     pollen = load_json(Path(args.pollen))
     school = load_json(Path(args.school))
-    state = build_dashboard_state(parsed, planting, pollen, school)
+    town = load_json(Path(args.town))
+    state = build_dashboard_state(parsed, planting, pollen, school, town)
     prompt = render_prompt(parsed, state)
 
     output_path = Path(args.output)
