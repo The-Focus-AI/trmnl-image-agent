@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """Process image for TRMNL e-ink display.
-Resizes to 800x480 with aspect-preserving fill/crop,
-converts to 1-bit black/white using Floyd-Steinberg dithering.
-Output: same path with '-full' removed from filename.
+Resizes to 800x480 with aspect-preserving fill/crop.
+Converts to 1-bit using clean thresholding with auto level.
 """
-import os
 import sys
 from pathlib import Path
 
@@ -14,9 +12,19 @@ except ImportError:
     Image = None
 
 
+def auto_level(img):
+    """Stretch histogram to use full range before thresholding."""
+    pixels = list(img.getdata())
+    lo = min(pixels)
+    hi = max(pixels)
+    if hi - lo < 10:
+        return img
+    return img.point(lambda x: int((x - lo) * 255 / (hi - lo)))
+
+
 def main():
     if len(sys.argv) < 2:
-        print("Usage: process-image <input-full.png-or.jpg>", file=sys.stderr)
+        print("Usage: process-image <input-full.png-or-jpg>", file=sys.stderr)
         sys.exit(1)
 
     input_path = Path(sys.argv[1])
@@ -24,31 +32,25 @@ def main():
         print(f"Error: Input file not found: {input_path}", file=sys.stderr)
         sys.exit(1)
 
-    # Handle JPEG-in-PNG disguise (Gemini quirk)
     raw = input_path.read_bytes()
     is_jpeg = raw[:2] == b'\xff\xd8'
 
-    # Generate output filename (remove -full suffix)
     out_name = input_path.name.replace("-full", "")
     if out_name == input_path.name:
         out_name = input_path.stem + "-processed" + input_path.suffix
     out_path = input_path.parent / out_name
+    out_path = out_path.with_suffix(".png")
 
     print(f"Processing image for TRMNL...", file=sys.stderr)
     print(f"  Input:  {input_path}", file=sys.stderr)
     print(f"  Output: {out_path}", file=sys.stderr)
-    if is_jpeg:
-        print(f"  Note:   input is JPEG-in-PNG (Gemini quirk)", file=sys.stderr)
 
-    # Use Python Pillow if available
-    if Image is not None:
-        img = Image.open(input_path)
-        src_dims = f"{img.width}x{img.height}"
-    else:
-        print("Error: Pillow not installed. Install with: pip install Pillow", file=sys.stderr)
+    if Image is None:
+        print("Error: Pillow not installed.", file=sys.stderr)
         sys.exit(1)
 
-    print(f"  Source: {src_dims}", file=sys.stderr)
+    img = Image.open(input_path)
+    print(f"  Source: {img.width}x{img.height}", file=sys.stderr)
 
     # Aspect-preserving fill/crop to 800x480
     target_w, target_h = 800, 480
@@ -56,40 +58,45 @@ def main():
     target_ratio = target_w / target_h
 
     if img_ratio > target_ratio:
-        # Wider than target: crop sides
         new_w = int(img.height * target_ratio)
         offset = (img.width - new_w) // 2
         img = img.crop((offset, 0, offset + new_w, img.height))
     else:
-        # Taller than target: crop top/bottom
         new_h = int(img.width / target_ratio)
         offset = (img.height - new_h) // 2
         img = img.crop((0, offset, img.width, offset + new_h))
 
     img = img.resize((target_w, target_h), Image.LANCZOS)
-
-    # Convert to grayscale
     img = img.convert('L')
 
-    # Gemini tends to generate mid-dark images. Lighten slightly before
-    # dithering so the e-ink version stays airy and readable.
-    img = img.point(lambda x: min(255, int(x * 2.0)))
+    # Straight threshold at 40% (102/255) — only pixels darker than
+    # 40% gray become black, keeping the image light and airy.
+    # No auto_level — that stretches midtones and makes things worse.
+    img = img.point(lambda x: 255 if x > 51 else 0, '1')
 
-    # Floyd-Steinberg dither to 1-bit
-    img_dithered = img.convert('1', dither=Image.FLOYDSTEINBERG)
-    out_path = out_path.with_suffix(".png")
-    img_dithered.save(out_path, optimize=True)
-    size_kb = os.path.getsize(out_path) // 1024
-    print(f"  Floyd-Steinberg dither: {size_kb}KB", file=sys.stderr)
+    img.save(out_path, optimize=True)
+    size_kb = out_path.stat().st_size // 1024
 
+    # If over 90KB, bump threshold to 60%
     if size_kb > 90:
-        print(f"  {size_kb}KB exceeds 90KB limit — downsizing to 640x384...", file=sys.stderr)
-        # Downsize to reduce pixel count, re-process
-        img_small = img.resize((640, 384), Image.LANCZOS)
-        img_small = img_small.convert('1', dither=Image.FLOYDSTEINBERG)
-        img_small.save(out_path, optimize=True)
-        size_kb = os.path.getsize(out_path) // 1024
-        print(f"  Downsized dither: {size_kb}KB (640x384)", file=sys.stderr)
+        print(f"  {size_kb}KB — retrying with 60% threshold", file=sys.stderr)
+        img2 = Image.open(input_path)
+        if img_ratio > target_ratio:
+            new_w = int(img2.height * target_ratio)
+            offset = (img2.width - new_w) // 2
+            img2 = img2.crop((offset, 0, offset + new_w, img2.height))
+        else:
+            new_h = int(img2.width / target_ratio)
+            offset = (img2.height - new_h) // 2
+            img2 = img2.crop((0, offset, img2.width, offset + new_h))
+        img2 = img2.resize((target_w, target_h), Image.LANCZOS)
+        img2 = img2.convert('L')
+        img2 = auto_level(img2)
+        img2 = img2.point(lambda x: 255 if x > 153 else 0, '1')
+        img2.save(out_path, optimize=True)
+        size_kb = out_path.stat().st_size // 1024
+
+    print(f"  Size:   {size_kb}KB", file=sys.stderr)
 
     # Copy to latest.png
     repo_root = Path(__file__).resolve().parent.parent
