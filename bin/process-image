@@ -68,60 +68,24 @@ def main():
 
     img = img.resize((target_w, target_h), Image.LANCZOS)
 
-    # Convert to grayscale with contrast boost to help 1-bit legibility
+    # Convert to grayscale — no contrast boost, let Gemini's image speak for itself
     img = img.convert('L')
-    img = img.point(lambda x: max(0, min(255, int(x * 0.85))))
 
-    # Convert to 1-bit using Atkinson dither — cleaner than Floyd-Steinberg,
-    # less noise, compresses better. Falls back to Bayer ordered dither
-    # if Atkinson produces files over 90KB.
-    from PIL import ImageOps
-
-    # Try Atkinson dither first (saves ~30% vs Floyd-Steinberg)
+    # Floyd-Steinberg dither to 1-bit
     img_dithered = img.convert('1', dither=Image.FLOYDSTEINBERG)
     out_path = out_path.with_suffix(".png")
     img_dithered.save(out_path, optimize=True)
     size_kb = os.path.getsize(out_path) // 1024
+    print(f"  Floyd-Steinberg dither: {size_kb}KB", file=sys.stderr)
 
     if size_kb > 90:
-        print(f"  FS dither: {size_kb}KB — too big, trying Bayer ordered dither...", file=sys.stderr)
-        # Bayer ordered dither produces structured patterns PNG compresses well
-        import numpy as np
-        arr = np.array(img, dtype=np.uint16)
-
-        # Bayer 8x8 threshold matrix
-        BAYER8 = np.array([
-            [0, 32, 8, 40, 2, 34, 10, 42],
-            [48, 16, 56, 24, 50, 18, 58, 26],
-            [12, 44, 4, 36, 14, 46, 6, 38],
-            [60, 28, 52, 20, 62, 30, 54, 22],
-            [3, 35, 11, 43, 1, 33, 9, 41],
-            [51, 19, 59, 27, 49, 17, 57, 25],
-            [15, 47, 7, 39, 13, 45, 5, 37],
-            [63, 31, 55, 23, 61, 29, 53, 21],
-        ], dtype=np.uint16)
-
-        # Tile the Bayer matrix to image size
-        h, w = arr.shape
-        tile_h = (h + 7) // 8
-        tile_w = (w + 7) // 8
-        threshold = np.tile(BAYER8, (tile_h, tile_w))[:h, :w]
-
-        # Scale: pixel value 0-255 → compare with threshold 0-63
-        # Multiply threshold by 4 so both are in 0-252 range
-        bits = (arr > threshold * 4).astype(np.uint8) * 255
-        bayer_img = Image.fromarray(bits, mode='L').convert('1')
-        bayer_img.save(out_path, optimize=True)
+        print(f"  {size_kb}KB exceeds 90KB limit — downsizing to 640x384...", file=sys.stderr)
+        # Downsize to reduce pixel count, re-process
+        img_small = img.resize((640, 384), Image.LANCZOS)
+        img_small = img_small.convert('1', dither=Image.FLOYDSTEINBERG)
+        img_small.save(out_path, optimize=True)
         size_kb = os.path.getsize(out_path) // 1024
-        print(f"  Bayer ordered dither: {size_kb}KB", file=sys.stderr)
-
-    # Absolute fallback: threshold if still too big (should never happen)
-    if size_kb > 90:
-        print(f"  Still {size_kb}KB — thresholding at 50%", file=sys.stderr)
-        img_bw = img.point(lambda x: 255 if x > 127 else 0, '1')
-        img_bw.save(out_path, optimize=True)
-        size_kb = os.path.getsize(out_path) // 1024
-        print(f"  Threshold: {size_kb}KB", file=sys.stderr)
+        print(f"  Downsized dither: {size_kb}KB (640x384)", file=sys.stderr)
 
     # Copy to latest.png
     repo_root = Path(__file__).resolve().parent.parent
