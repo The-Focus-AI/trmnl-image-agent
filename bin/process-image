@@ -68,8 +68,12 @@ def main():
 
     img = img.resize((target_w, target_h), Image.LANCZOS)
 
-    # Convert to grayscale — no contrast boost, let Gemini's image speak for itself
+    # Convert to grayscale
     img = img.convert('L')
+
+    # Gemini tends to generate mid-dark images. Lighten slightly before
+    # dithering so the e-ink version stays airy and readable.
+    img = img.point(lambda x: min(255, int(x * 2.0)))
 
     # Floyd-Steinberg dither to 1-bit
     img_dithered = img.convert('1', dither=Image.FLOYDSTEINBERG)
