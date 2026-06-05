@@ -59,14 +59,18 @@ if [ -n "$IMAGE_ASPECT" ]; then
   CMD+=(--aspect "$IMAGE_ASPECT")
 fi
 
+# Fix: Gemini may write JPEG data to the .png file
+# After generation, check the header and rename if needed
 echo "Generating image with local Gemini wrapper..." >&2
-echo "  model:       $IMAGE_MODEL" >&2
-echo "  image_size:  $IMAGE_SIZE" >&2
-if [ -n "$IMAGE_ASPECT" ]; then
-  echo "  aspect:      $IMAGE_ASPECT" >&2
-else
-  echo "  aspect:      prompt-driven (no API aspect override)" >&2
-fi
 "${CMD[@]}"
 
-echo "$OUTPUT_FILE"
+# Check actual format and rename if needed
+REAL_TYPE=$(file "$OUTPUT_FILE" | grep -o 'JPEG\|PNG' | head -1)
+if [ "$REAL_TYPE" = "JPEG" ]; then
+  JPEG_FILE="${OUTPUT_FILE%.png}.jpg"
+  mv "$OUTPUT_FILE" "$JPEG_FILE"
+  echo "  Note: Gemini output was JPEG, renamed to .jpg" >&2
+  echo "$JPEG_FILE"
+else
+  echo "$OUTPUT_FILE"
+fi

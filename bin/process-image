@@ -1,106 +1,136 @@
-#!/bin/bash
-# Process image for TRMNL e-ink display
-# Resizes to 800x480 and converts to 1-bit black/white
-# Input: full-size image path
-# Output: TRMNL-ready image path (same name without -full suffix)
+#!/usr/bin/env python3
+"""Process image for TRMNL e-ink display.
+Resizes to 800x480 with aspect-preserving fill/crop,
+converts to 1-bit black/white using Floyd-Steinberg dithering.
+Output: same path with '-full' removed from filename.
+"""
+import os
+import sys
+from pathlib import Path
 
-set -euo pipefail
+try:
+    from PIL import Image
+except ImportError:
+    Image = None
 
-INPUT_FILE="$1"
 
-if [ -z "$INPUT_FILE" ] || [ ! -f "$INPUT_FILE" ]; then
-  echo "Usage: process-image <input-full.png>" >&2
-  echo "Error: Input file not found: $INPUT_FILE" >&2
-  exit 1
-fi
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: process-image <input-full.png-or.jpg>", file=sys.stderr)
+        sys.exit(1)
 
-# Generate output filename (remove -full suffix)
-OUTPUT_FILE="${INPUT_FILE/-full/}"
+    input_path = Path(sys.argv[1])
+    if not input_path.exists():
+        print(f"Error: Input file not found: {input_path}", file=sys.stderr)
+        sys.exit(1)
 
-if [ "$INPUT_FILE" = "$OUTPUT_FILE" ]; then
-  # No -full suffix, add -processed
-  OUTPUT_FILE="${INPUT_FILE%.png}-processed.png"
-fi
+    # Handle JPEG-in-PNG disguise (Gemini quirk)
+    raw = input_path.read_bytes()
+    is_jpeg = raw[:2] == b'\xff\xd8'
 
-echo "Processing image for TRMNL..." >&2
-echo "  Input:  $INPUT_FILE" >&2
-echo "  Output: $OUTPUT_FILE" >&2
+    # Generate output filename (remove -full suffix)
+    out_name = input_path.name.replace("-full", "")
+    if out_name == input_path.name:
+        out_name = input_path.stem + "-processed" + input_path.suffix
+    out_path = input_path.parent / out_name
 
-INPUT_DIMS=$(magick identify -format '%wx%h' "$INPUT_FILE"[0])
-echo "  Source: $INPUT_DIMS" >&2
+    print(f"Processing image for TRMNL...", file=sys.stderr)
+    print(f"  Input:  {input_path}", file=sys.stderr)
+    print(f"  Output: {out_path}", file=sys.stderr)
+    if is_jpeg:
+        print(f"  Note:   input is JPEG-in-PNG (Gemini quirk)", file=sys.stderr)
 
-if [ "$INPUT_DIMS" = "800x480" ]; then
-  echo "  Mode:   native dimensions detected; skipping resize" >&2
-  magick "$INPUT_FILE" \
-    -colorspace Gray \
-    -threshold 50% \
-    -colors 2 \
-    -depth 1 \
-    "PNG8:$OUTPUT_FILE"
-else
-  echo "  Mode:   resizing/cropping to 800x480" >&2
-  # Resize and convert to 1-bit without distortion
-  magick "$INPUT_FILE" \
-    -resize 800x480^ \
-    -gravity center \
-    -extent 800x480 \
-    -colorspace Gray \
-    -threshold 50% \
-    -colors 2 \
-    -depth 1 \
-    "PNG8:$OUTPUT_FILE"
-fi
+    # Use Python Pillow if available
+    if Image is not None:
+        img = Image.open(input_path)
+        src_dims = f"{img.width}x{img.height}"
+    else:
+        print("Error: Pillow not installed. Install with: pip install Pillow", file=sys.stderr)
+        sys.exit(1)
 
-# Verify output - use portable stat
-if [ "$(uname)" = "Darwin" ]; then
-  SIZE=$(stat -f%z "$OUTPUT_FILE")
-else
-  SIZE=$(stat -c%s "$OUTPUT_FILE")
-fi
-SIZE_KB=$((SIZE / 1024))
+    print(f"  Source: {src_dims}", file=sys.stderr)
 
-if [ "$SIZE_KB" -gt 90 ]; then
-  echo "Warning: Output file is ${SIZE_KB}KB, exceeds TRMNL 90KB limit!" >&2
-  echo "Trying higher threshold..." >&2
-  if [ "$INPUT_DIMS" = "800x480" ]; then
-    magick "$INPUT_FILE" \
-      -colorspace Gray \
-      -threshold 60% \
-      -colors 2 \
-      -depth 1 \
-      "PNG8:$OUTPUT_FILE"
-  else
-    magick "$INPUT_FILE" \
-      -resize 800x480^ \
-      -gravity center \
-      -extent 800x480 \
-      -colorspace Gray \
-      -threshold 60% \
-      -colors 2 \
-      -depth 1 \
-      "PNG8:$OUTPUT_FILE"
-  fi
-  if [ "$(uname)" = "Darwin" ]; then
-    SIZE=$(stat -f%z "$OUTPUT_FILE")
-  else
-    SIZE=$(stat -c%s "$OUTPUT_FILE")
-  fi
-  SIZE_KB=$((SIZE / 1024))
-fi
+    # Aspect-preserving fill/crop to 800x480
+    target_w, target_h = 800, 480
+    img_ratio = img.width / img.height
+    target_ratio = target_w / target_h
 
-echo "  Size:   ${SIZE_KB}KB" >&2
+    if img_ratio > target_ratio:
+        # Wider than target: crop sides
+        new_w = int(img.height * target_ratio)
+        offset = (img.width - new_w) // 2
+        img = img.crop((offset, 0, offset + new_w, img.height))
+    else:
+        # Taller than target: crop top/bottom
+        new_h = int(img.width / target_ratio)
+        offset = (img.height - new_h) // 2
+        img = img.crop((0, offset, img.width, offset + new_h))
 
-# Verify dimensions using file command (portable)
-DIMENSIONS=$(file "$OUTPUT_FILE" | grep -o '[0-9]* x [0-9]*' || echo "800 x 480")
-echo "  Dims:   $DIMENSIONS" >&2
+    img = img.resize((target_w, target_h), Image.LANCZOS)
 
-# Copy to latest.png for GitHub Pages / Image Display plugin
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="$(dirname "$SCRIPT_DIR")"
-LATEST_FILE="$REPO_ROOT/output/latest.png"
-# Remove any existing file/symlink first to ensure clean copy
-rm -f "$LATEST_FILE"
-cp "$OUTPUT_FILE" "$LATEST_FILE"
-echo "  Latest: $LATEST_FILE" >&2
+    # Grayscale + Floyd-Steinberg dither to 1-bit
+    img = img.convert('L')
+    img = img.convert('1', dither=Image.FLOYDSTEINBERG)
 
-echo "$OUTPUT_FILE"
+    # Save as PNG8
+    img.save(out_path, optimize=True)
+
+    size_bytes = out_path.stat().st_size
+    size_kb = size_bytes // 1024
+    print(f"  Size:   {size_kb}KB", file=sys.stderr)
+
+    if size_kb > 90:
+        print(f"Warning: Output is {size_kb}KB, exceeds TRMNL 90KB limit!", file=sys.stderr)
+        # Try aggressive threshold to reduce complexity
+        out_path = out_path.with_suffix(".png")
+        img2 = Image.open(input_path)
+        # Re-crop
+        if img_ratio > target_ratio:
+            new_w = int(img2.height * target_ratio)
+            offset = (img2.width - new_w) // 2
+            img2 = img2.crop((offset, 0, offset + new_w, img2.height))
+        else:
+            new_h = int(img2.width / target_ratio)
+            offset = (img2.height - new_h) // 2
+            img2 = img2.crop((0, offset, img2.width, offset + new_h))
+        img2 = img2.resize((target_w, target_h), Image.LANCZOS)
+        img2 = img2.convert('L')
+        # Hard threshold at 60% with contrast boost to preserve detail
+        img2 = img2.point(lambda x: max(0, min(255, int(x * 0.7))))
+        img2 = img2.point(lambda x: 255 if x > 153 else 0, '1')
+        img2.save(out_path, optimize=True)
+        size_kb = out_path.stat().st_size // 1024
+        print(f"  Retry size: {size_kb}KB (threshold 60%)", file=sys.stderr)
+        # If still too big, go lower
+        if size_kb > 90:
+            img2 = img2.point(lambda x: 255, '1')  # All white
+            # Actually - try threshold 70%
+            img3 = Image.open(input_path)
+            if img_ratio > target_ratio:
+                new_w = int(img3.height * target_ratio)
+                offset = (img3.width - new_w) // 2
+                img3 = img3.crop((offset, 0, offset + new_w, img3.height))
+            else:
+                new_h = int(img3.width / target_ratio)
+                offset = (img3.height - new_h) // 2
+                img3 = img3.crop((0, offset, img3.width, offset + new_h))
+            img3 = img3.resize((target_w, target_h), Image.LANCZOS)
+            img3 = img3.convert('L')
+            img3 = img3.point(lambda x: 255 if x > 178 else 0, '1')
+            img3.save(out_path, optimize=True)
+            size_kb = out_path.stat().st_size // 1024
+            print(f"  Retry size: {size_kb}KB (threshold 70%)", file=sys.stderr)
+
+    # Copy to latest.png
+    repo_root = Path(__file__).resolve().parent.parent
+    latest = repo_root / "output" / "latest.png"
+    latest.unlink(missing_ok=True)
+    import shutil
+    shutil.copy2(out_path, latest)
+    print(f"  Latest: {latest}", file=sys.stderr)
+
+    print(out_path)
+
+
+if __name__ == "__main__":
+    main()
