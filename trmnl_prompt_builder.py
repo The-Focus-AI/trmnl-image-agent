@@ -903,6 +903,8 @@ BOTANICAL TRUTH MODE:
 
     prompt = f"""Black and white 1-bit illustration for TRMNL e-ink display. Wide 5:3 landscape format at 800x480. Compose for the final TRMNL frame itself rather than a wider cinematic canvas. Render at exactly 800x480 pixels natively if the model supports explicit output dimensions; do not simulate a wider poster that will need later reframing. Use ONLY pure black and pure white with no gray tones. All shading must be hatching, cross-hatching, stipple, or solid fills that survive thresholding.
 
+CRITICAL — THIS IS FOR 1-BIT E-INK: Use HIGH CONTRAST. The image will be converted to pure black-and-white, so avoid thin lines, delicate shading, or light-gray areas that will disappear in conversion. Make text blocks SOLID BLACK on WHITE background. Use thick outlines, large shapes, and bold fills. If in doubt, make it darker — not lighter.
+
 SCENE: {scene_text}{pollen_truth_block}
 
 PRIMARY STORY: The image should explain today's most useful outdoor information at a glance. Use plain language. If pollen is high, say exactly which kind of pollen is high rather than vague slogans.
