@@ -7,18 +7,14 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# Load .env file if it exists
-if [ -f "$SCRIPT_DIR/.env" ]; then
-    set -a
-    # shellcheck disable=SC1090
-    . "$SCRIPT_DIR/.env"
-    set +a
-fi
+# Load XAI_API_KEY from env, .env, 1Password, or Grok CLI OAuth session
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/bin/load-xai-env"
 
 # Verify required variables
-if [ -z "${GEMINI_API_KEY:-}" ]; then
-    echo "Error: GEMINI_API_KEY not set"
-    echo "Set it in .env, environment, or make sure 1Password CLI is available to bin/generate-image"
+if [ -z "${XAI_API_KEY:-}" ]; then
+    echo "Error: XAI_API_KEY not set"
+    echo "Set it in .env, run 'grok login', or create a key at https://console.x.ai"
     exit 1
 fi
 

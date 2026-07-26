@@ -1,11 +1,12 @@
 #!/bin/bash
 
 # Setup script for TRMNL Image Agent
-# Checks for .env file and creates one if missing using Claude
+# Checks for .env file and creates a template if missing
 
-set -e
+set -euo pipefail
 
-ENV_FILE=".env"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ENV_FILE="$SCRIPT_DIR/.env"
 
 if [ -f "$ENV_FILE" ]; then
     echo ".env file already exists. Skipping setup."
@@ -13,11 +14,29 @@ if [ -f "$ENV_FILE" ]; then
     exit 0
 fi
 
-echo "No .env file found. Running Claude to generate environment configuration..."
-echo ""
+echo "No .env file found. Creating template..."
 
-claude --model sonnet --verbose -p --output-format=stream-json --dangerously-skip-permissions \
-  "Read CLAUDE.md to find the required environment variables and their 1Password paths. For each variable, first check if it's already set in the environment. If set, use that value. If not set, fetch from 1Password using the op command. Write all variables to a .env file."
+# Prefer existing environment value, then 1Password, else empty template
+XAI_VALUE="${XAI_API_KEY:-}"
+if [ -z "$XAI_VALUE" ] && command -v op >/dev/null 2>&1; then
+  XAI_VALUE="$(op read 'op://Development/xAI API Key/credential' 2>/dev/null || true)"
+fi
+
+if [ -n "$XAI_VALUE" ]; then
+  umask 077
+  printf 'XAI_API_KEY=%s\n' "$XAI_VALUE" > "$ENV_FILE"
+  echo "Wrote XAI_API_KEY to .env from available credentials."
+else
+  umask 077
+  cat > "$ENV_FILE" <<'EOF'
+# Get a key at https://console.x.ai
+XAI_API_KEY=
+EOF
+  echo "Created .env template. Add your XAI_API_KEY, then re-run."
+fi
+
+echo "Installing Node dependencies..."
+npm install --no-fund --no-audit --prefix "$SCRIPT_DIR"
 
 echo ""
-echo "Setup complete. Please verify the .env file was created correctly."
+echo "Setup complete."
