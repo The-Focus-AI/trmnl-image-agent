@@ -1,13 +1,17 @@
 #!/bin/bash
-# Parse raw weather and Mohawk data using Claude Haiku
+# Parse raw weather and Mohawk data using Grok (xAI)
 # Reads from /tmp/trmnl-data/
 # Outputs JSON to /tmp/trmnl-data/parsed.json
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 DATA_DIR="/tmp/trmnl-data"
 OUTPUT_FILE="$DATA_DIR/parsed.json"
+ENV_FILE="$PROJECT_DIR/.env"
+PARSE_MODEL="${TRMNL_PARSE_MODEL:-grok-4.5}"
+XAI_BASE_URL="${XAI_BASE_URL:-https://api.x.ai/v1}"
 
 # Check for required files
 if [ ! -f "$DATA_DIR/weather.html" ]; then
@@ -20,54 +24,100 @@ if [ ! -f "$DATA_DIR/mohawk.txt" ]; then
   exit 1
 fi
 
+# Load XAI_API_KEY from env, .env, 1Password, or Grok CLI OAuth session
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/load-xai-env"
 
-# Create the prompt for Haiku using build-prompt-data.py
-PROMPT=$("$SCRIPT_DIR/build-prompt-data.py")
-echo "Parsing data with Claude Haiku..." >&2
+if [ -z "${XAI_API_KEY:-}" ]; then
+  echo "Error: XAI_API_KEY not set" >&2
+  echo "Set XAI_API_KEY in .env, run 'grok login', or create a key at https://console.x.ai" >&2
+  exit 1
+fi
+if [ "${XAI_AUTH_SOURCE:-}" = "grok-cli-oauth" ]; then
+  echo "  Auth: Grok CLI OAuth session" >&2
+fi
 
-# Call Claude with haiku model and text output format
-# Unset CLAUDECODE to allow running from within a Claude Code session
-RESULT=$(echo "$PROMPT" | CLAUDECODE= claude --model haiku --print --permission-mode bypassPermissions 2>/dev/null)
+# Create the prompt for Grok using build-prompt-data.py
+PROMPT_FILE=$(mktemp)
+BODY_FILE=$(mktemp)
+RESPONSE_FILE=$(mktemp)
+trap 'rm -f "$PROMPT_FILE" "$BODY_FILE" "$RESPONSE_FILE"' EXIT
+
+"$SCRIPT_DIR/build-prompt-data.py" > "$PROMPT_FILE"
+echo "Parsing data with Grok ($PARSE_MODEL)..." >&2
+
+# Build OpenAI-compatible chat completion request
+jq -n \
+  --rawfile prompt "$PROMPT_FILE" \
+  --arg model "$PARSE_MODEL" \
+  '{
+    model: $model,
+    temperature: 0,
+    messages: [
+      {
+        role: "system",
+        content: "You extract structured JSON from weather, ski, school, and seasonal data for a TRMNL e-ink dashboard. Reply with ONLY a single valid JSON object. No markdown fences, no commentary."
+      },
+      {
+        role: "user",
+        content: $prompt
+      }
+    ]
+  }' > "$BODY_FILE"
+
+HTTP_CODE=$(curl -sS -o "$RESPONSE_FILE" -w "%{http_code}" \
+  "${XAI_BASE_URL}/chat/completions" \
+  -H "Authorization: Bearer ${XAI_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d @"$BODY_FILE")
+
+if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+  echo "Error: xAI chat API returned HTTP $HTTP_CODE" >&2
+  head -c 2000 "$RESPONSE_FILE" >&2 || true
+  echo >&2
+  exit 1
+fi
+
+RESULT=$(jq -r '.choices[0].message.content // empty' "$RESPONSE_FILE")
+if [ -z "$RESULT" ]; then
+  echo "Error: Empty content from Grok chat API" >&2
+  head -c 2000 "$RESPONSE_FILE" >&2 || true
+  echo >&2
+  exit 1
+fi
 
 # Extract JSON from the result - handle markdown code blocks
-CLEAN_RESULT=$(echo "$RESULT" | sed 's/^```json//' | sed 's/^```//' | sed 's/```$//')
+CLEAN_RESULT=$(printf '%s\n' "$RESULT" | sed 's/^```json//' | sed 's/^```//' | sed 's/```$//')
 
-# Find the JSON object
-JSON_RESULT=$(echo "$CLEAN_RESULT" | grep -o '{[^}]*"date"[^}]*}' | head -1)
-
-# If that didn't work, try to extract everything between first { and last }
-if [ -z "$JSON_RESULT" ] || ! echo "$JSON_RESULT" | jq . > /dev/null 2>&1; then
-  # More aggressive extraction - get content between first { and matching }
-  JSON_RESULT=$(echo "$CLEAN_RESULT" | awk '/{/{p=1} p{print} /}/{p=0}' | tr '\n' ' ')
-fi
-
-# Write to output file
-echo "$JSON_RESULT" > "$OUTPUT_FILE"
-
-# Validate JSON
-if jq . "$OUTPUT_FILE" > /dev/null 2>&1; then
-  echo "Parsed data written to $OUTPUT_FILE" >&2
-else
-  echo "Warning: JSON validation failed, attempting to fix..." >&2
-  # Try to extract just the JSON part more aggressively
-  echo "$CLEAN_RESULT" | python3 -c "
-import sys
-import json
-import re
-
+# Prefer a full JSON parse via Python for nested objects
+JSON_RESULT=$(printf '%s\n' "$CLEAN_RESULT" | python3 -c '
+import sys, json, re
 text = sys.stdin.read()
-# Find JSON-like content
-match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', text, re.DOTALL)
-if match:
-    try:
-        obj = json.loads(match.group())
-        print(json.dumps(obj, indent=2))
-    except:
-        print(text)
-else:
-    print(text)
-" > "$OUTPUT_FILE" 2>/dev/null || echo "$CLEAN_RESULT" > "$OUTPUT_FILE"
+# Try direct parse first
+try:
+    obj = json.loads(text)
+    print(json.dumps(obj))
+    raise SystemExit(0)
+except Exception:
+    pass
+# Find first JSON object in text
+match = re.search(r"\{.*\}", text, re.DOTALL)
+if not match:
+    raise SystemExit(1)
+obj = json.loads(match.group(0))
+print(json.dumps(obj))
+' 2>/dev/null || true)
+
+if [ -z "$JSON_RESULT" ]; then
+  echo "Error: Could not extract valid JSON from Grok response" >&2
+  printf '%s\n' "$CLEAN_RESULT" | head -c 2000 >&2
+  echo >&2
+  exit 1
 fi
+
+# Write to output file (pretty)
+printf '%s\n' "$JSON_RESULT" | jq . > "$OUTPUT_FILE"
+echo "Parsed data written to $OUTPUT_FILE" >&2
 
 # Override maple fields deterministically (LLM gets these wrong)
 # Sap flows when it freezes at night and thaws during the day
@@ -111,7 +161,6 @@ fi
 echo "Maple override: sap_flowing=$SAP_FLOWING quality=$MAPLE_QUALITY (high=$HIGH low=$LOW)" >&2
 
 # Determine if Mohawk is closed for the season (off-season placeholder text)
-MOHAWK_TEXT=$(jq -r '.mohawk.status // "open"' "$OUTPUT_FILE")
 if grep -q "closed for the season" "$DATA_DIR/mohawk.txt" 2>/dev/null; then
   jq '.mohawk.status = "closed_season"' "$OUTPUT_FILE" > "${OUTPUT_FILE}.tmp" \
     && mv "${OUTPUT_FILE}.tmp" "$OUTPUT_FILE"

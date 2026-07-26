@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Build the Haiku parsing prompt from raw data.
+"""Build the Grok parsing prompt from raw data.
 Reads /tmp/trmnl-data/*, writes prompt text to stdout.
-The existing bin/parse-data reads this output and pipes it to Claude Haiku.
+The existing bin/parse-data reads this output and sends it to the xAI Grok API.
 """
 import json
 import re
@@ -153,6 +153,10 @@ IMPORTANT RULES:
 """
 
     print(prompt)
+
+    # Also write to temp file for reliable consumption by parse-data
+    with open("/tmp/trmnl-prompt.txt", "w") as f:
+        f.write(prompt)
 
 if __name__ == "__main__":
     main()

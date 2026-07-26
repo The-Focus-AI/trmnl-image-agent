@@ -23,22 +23,19 @@ The dashboard is now driven by a **Cornwall Seasonal State Engine**:
 ## Prerequisites
 
 - A TRMNL device
-- Claude Code with the following plugins:
-  - **nano-banana** - AI image generation using Google Gemini
-  - **chrome-driver** - Browser automation for screenshots
+- An **xAI API key** (`XAI_API_KEY`) from [console.x.ai](https://console.x.ai)
+- Node.js, Python 3, curl, jq, ImageMagick (`magick`)
 
-### Install Claude Code Plugins
+### Configure
 
 ```bash
-# Add the Focus.AI marketplace (one-time)
-/plugin marketplace add The-Focus-AI/claude-marketplace
+# One-time: create .env and install deps
+./setup.sh
 
-# Install required plugins
-/plugin install nano-banana@focus-marketplace
-/plugin install chrome-driver@focus-marketplace
+# Or manually:
+echo 'XAI_API_KEY=xai-...' > .env
+npm install
 ```
-
-Then restart Claude Code.
 
 ## TRMNL Setup (Image Display Plugin)
 
@@ -59,16 +56,18 @@ That's it! TRMNL will now pull the latest image whenever the display refreshes.
 Run the agent to generate a new image:
 
 ```bash
-claude --verbose -p --output-format=stream-json --dangerously-skip-permissions \
-  "update the image, then commit and push everything"
+./run.sh
 ```
 
-This will:
-1. Generate a new dashboard image using AI
-2. Process it for e-ink (800x480, 1-bit)
-3. Copy it to `output/latest.png`
-4. Commit and push to GitHub
-5. GitHub Pages automatically deploys the new image
+Pipeline:
+1. Fetch weather / ski / sun-moon / events data
+2. Parse into structured JSON with **Grok** (`grok-4.5`)
+3. Build the seasonal dashboard image prompt
+4. Generate the image with **Grok Imagine** (`grok-imagine-image-quality`)
+5. Process for e-ink (800x480, 1-bit) → `output/latest.png`
+6. Commit and push to GitHub (GitHub Pages deploys automatically)
+
+Set `PUBLISH_ON_SUCCESS=0` to skip the git commit/push step.
 
 ## Image Requirements
 

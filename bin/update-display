@@ -20,8 +20,8 @@ FETCH_TIME=$(date +%s)
 echo "  Done in $((FETCH_TIME - START_TIME))s" >&2
 echo "" >&2
 
-# Step 2: Parse data with Haiku
-echo "Step 2/5: Parsing data with AI..." >&2
+# Step 2: Parse data with Grok
+echo "Step 2/5: Parsing data with Grok..." >&2
 "$SCRIPT_DIR/parse-data" > /dev/null
 PARSE_TIME=$(date +%s)
 echo "  Done in $((PARSE_TIME - FETCH_TIME))s" >&2
@@ -36,8 +36,8 @@ echo "  Prompt: $PROMPT_FILE" >&2
 echo "  Done in $((BUILD_TIME - PARSE_TIME))s" >&2
 echo "" >&2
 
-# Step 4: Generate image with AI
-echo "Step 4/5: Generating image..." >&2
+# Step 4: Generate image with Grok Imagine
+echo "Step 4/5: Generating image with Grok Imagine..." >&2
 FULL_IMAGE=$("$SCRIPT_DIR/generate-image" "$PROMPT_FILE" | tail -1)
 GEN_TIME=$(date +%s)
 echo "  Output: $FULL_IMAGE" >&2
@@ -79,11 +79,11 @@ if [ "$PUBLISH_ON_SUCCESS" = "1" ]; then
   cp -f "$FINAL_IMAGE" "$OPENCLAW_MEDIA_DIR/latest.png"
 
   if git -C "$REPO_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    git -C "$REPO_DIR" add output/ bin/ trmnl_prompt_builder.py tests/ README.md CLAUDE.md prompts/ || true
+    git -C "$REPO_DIR" add output/ bin/ scripts/ package.json package-lock.json trmnl_prompt_builder.py tests/ README.md CLAUDE.md MEMORY.md prompts/ || true
     if ! git -C "$REPO_DIR" diff --cached --quiet --ignore-submodules --; then
       git -C "$REPO_DIR" commit -m "Update TRMNL image
 
-Co-Authored-By: Claude <agent@anthropic.com>"
+Co-Authored-By: Grok <noreply@x.ai>"
       git -C "$REPO_DIR" push
       echo "Published latest TRMNL image to GitHub Pages" >&2
     else

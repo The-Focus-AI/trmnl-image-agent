@@ -15,9 +15,20 @@ Images are served via **GitHub Pages** using the **Image Display plugin**:
 
 For each variable, first check if it's already set in the environment. If not set, fetch from 1Password using the `op read` command.
 
-| Variable | 1Password Path |
-|----------|----------------|
-| GEMINI_API_KEY | `op://Development/Google AI Studio Key/notesPlain` |
+| Variable | Sources (first match wins) |
+|----------|----------------------------|
+| XAI_API_KEY | env → `.env` → 1Password `op://Development/xAI API Key/credential` → Grok CLI OAuth (`~/.grok/auth.json`) |
+
+If you use Grok Build / `grok login`, no separate API key is required — the session token is reused for chat + Imagine.
+
+### Optional model overrides
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `TRMNL_PARSE_MODEL` | `grok-4.5` | Chat model used by `bin/parse-data` |
+| `TRMNL_IMAGE_MODEL` | `grok-imagine-image-quality` | Image model used by `bin/generate-image` |
+| `TRMNL_IMAGE_ASPECT` | `16:9` | Aspect ratio for Imagine API |
+| `TRMNL_IMAGE_RESOLUTION` | `1k` | `1k` or `2k` |
 
 ## TRMNL Image Limits
 
@@ -46,6 +57,15 @@ Static data in `prompts/school-calendar.json` — Region 1 school events. Used b
 
 ### Frost Risk
 Computed deterministically in `bin/parse-data` based on tonight's low temp during growing season (Mar-May, Sep-Oct). Levels: `hard_freeze` (<=28F), `frost` (<=32F), `light_frost` (<=36F).
+
+## AI Pipeline (Grok / xAI)
+
+| Step | Script | Model / API |
+|------|--------|-------------|
+| Parse raw data → JSON | `bin/parse-data` | `grok-4.5` via `POST /v1/chat/completions` |
+| Generate dashboard image | `bin/generate-image` | `grok-imagine-image-quality` via `POST /v1/images/generations` |
+
+Base URL: `https://api.x.ai/v1`
 
 ## Image Processing
 

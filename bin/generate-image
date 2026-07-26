@@ -1,5 +1,5 @@
 #!/bin/bash
-# Generate TRMNL image using local Gemini image wrapper
+# Generate TRMNL image using xAI Grok Imagine
 # Uses prompt from /tmp/trmnl-prompt.txt
 # Outputs to output/YYYY-MM/YYYY-MM-DD-HH-MM-full.png
 
@@ -7,14 +7,14 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$PROJECT_DIR"
 PROMPT_FILE="${1:-/tmp/trmnl-prompt.txt}"
 OUTPUT_DIR="output/$(date +%Y-%m)"
 OUTPUT_FILE="$OUTPUT_DIR/$(date +%Y-%m-%d-%H-%M)-full.png"
 ENV_FILE="$PROJECT_DIR/.env"
-IMAGE_MODEL="${TRMNL_IMAGE_MODEL:-gemini-3.1-flash-image-preview}"
-IMAGE_SIZE="${TRMNL_IMAGE_SIZE:-1K}"
-IMAGE_ASPECT="${TRMNL_IMAGE_ASPECT:-}"
-IMAGE_MIME_TYPE="${TRMNL_IMAGE_MIME_TYPE:-image/png}"
+IMAGE_MODEL="${TRMNL_IMAGE_MODEL:-grok-imagine-image-quality}"
+IMAGE_RESOLUTION="${TRMNL_IMAGE_RESOLUTION:-1k}"
+IMAGE_ASPECT="${TRMNL_IMAGE_ASPECT:-16:9}"
 
 if [ ! -f "$PROMPT_FILE" ]; then
   echo "Error: Prompt file not found: $PROMPT_FILE" >&2
@@ -25,51 +25,40 @@ fi
 # Ensure output directory exists
 mkdir -p "$OUTPUT_DIR"
 
-# Load .env if available before falling back to 1Password
-if [ -z "${GEMINI_API_KEY:-}" ] && [ -f "$ENV_FILE" ]; then
-  set -a
-  # shellcheck disable=SC1090
-  . "$ENV_FILE"
-  set +a
+# Load XAI_API_KEY from env, .env, 1Password, or Grok CLI OAuth session
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/load-xai-env"
+
+if [ -z "${XAI_API_KEY:-}" ]; then
+  echo "Error: XAI_API_KEY not set" >&2
+  echo "Set XAI_API_KEY in .env, run 'grok login', or create a key at https://console.x.ai" >&2
+  exit 1
+fi
+if [ "${XAI_AUTH_SOURCE:-}" = "grok-cli-oauth" ]; then
+  echo "  Auth: Grok CLI OAuth session" >&2
 fi
 
-# Check for GEMINI_API_KEY
-if [ -z "${GEMINI_API_KEY:-}" ]; then
-  if command -v op >/dev/null 2>&1; then
-    export GEMINI_API_KEY="$(op read 'op://Development/Google AI Studio Key/notesPlain')"
-  else
-    echo "Error: GEMINI_API_KEY not set and 1Password CLI not available" >&2
-    exit 1
-  fi
+if [ ! -d "$PROJECT_DIR/node_modules/openai" ]; then
+  echo "Installing local Node dependencies for Grok image wrapper..." >&2
+  npm install --no-fund --no-audit --prefix "$PROJECT_DIR" >&2
 fi
 
-if [ ! -d "$PROJECT_DIR/node_modules" ]; then
-  echo "Installing local Node dependencies for Gemini image wrapper..." >&2
-  npm install --no-fund --no-audit >&2
-fi
-
-CMD=(node "$PROJECT_DIR/scripts/gemini-image-cli.mjs" \
+CMD=(node "$PROJECT_DIR/scripts/grok-image-cli.mjs" \
   --prompt-file "$PROMPT_FILE" \
   --output "$OUTPUT_FILE" \
   --model "$IMAGE_MODEL" \
-  --image-size "$IMAGE_SIZE" \
-  --mime-type "$IMAGE_MIME_TYPE")
+  --resolution "$IMAGE_RESOLUTION" \
+  --aspect "$IMAGE_ASPECT")
 
-if [ -n "$IMAGE_ASPECT" ]; then
-  CMD+=(--aspect "$IMAGE_ASPECT")
-fi
-
-# Fix: Gemini may write JPEG data to the .png file
-# After generation, check the header and rename if needed
-echo "Generating image with local Gemini wrapper..." >&2
+echo "Generating image with Grok Imagine..." >&2
 "${CMD[@]}"
 
-# Check actual format and rename if needed
-REAL_TYPE=$(file "$OUTPUT_FILE" | grep -o 'JPEG\|PNG' | head -1)
+# Check actual format and rename if needed (API may return JPEG bytes)
+REAL_TYPE=$(file "$OUTPUT_FILE" | grep -o 'JPEG\|PNG' | head -1 || true)
 if [ "$REAL_TYPE" = "JPEG" ]; then
   JPEG_FILE="${OUTPUT_FILE%.png}.jpg"
   mv "$OUTPUT_FILE" "$JPEG_FILE"
-  echo "  Note: Gemini output was JPEG, renamed to .jpg" >&2
+  echo "  Note: Grok output was JPEG, renamed to .jpg" >&2
   echo "$JPEG_FILE"
 else
   echo "$OUTPUT_FILE"

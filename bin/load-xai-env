@@ -1,0 +1,80 @@
+#!/bin/bash
+# Load XAI_API_KEY into the current shell environment.
+# Intended to be sourced:  source "$SCRIPT_DIR/load-xai-env"
+#
+# Resolution order:
+#   1. Existing XAI_API_KEY in the environment
+#   2. Project .env
+#   3. 1Password (optional): op://Development/xAI API Key/credential
+#   4. Grok CLI OAuth session: ~/.grok/auth.json (access token under "key")
+
+_xai_env_file="${XAI_ENV_FILE:-}"
+if [ -z "$_xai_env_file" ]; then
+  _xai_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  _xai_env_file="$(cd "$_xai_script_dir/.." && pwd)/.env"
+fi
+
+if [ -z "${XAI_API_KEY:-}" ] && [ -f "$_xai_env_file" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  . "$_xai_env_file"
+  set +a
+fi
+
+if [ -z "${XAI_API_KEY:-}" ] && command -v op >/dev/null 2>&1; then
+  if _xai_from_op="$(op read 'op://Development/xAI API Key/credential' 2>/dev/null)"; then
+    export XAI_API_KEY="$_xai_from_op"
+  fi
+  unset _xai_from_op
+fi
+
+if [ -z "${XAI_API_KEY:-}" ] && [ -f "${HOME}/.grok/auth.json" ]; then
+  # Prefer a non-expired OIDC access token from the Grok Build / grok CLI session.
+  _xai_from_grok="$(
+    python3 - <<'PY'
+import json
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+path = Path.home() / ".grok" / "auth.json"
+try:
+    data = json.loads(path.read_text())
+except Exception:
+    sys.exit(0)
+
+now = datetime.now(timezone.utc)
+best = None
+best_exp = None
+for entry in data.values() if isinstance(data, dict) else []:
+    if not isinstance(entry, dict):
+        continue
+    key = entry.get("key") or entry.get("access_token")
+    if not key:
+        continue
+    exp_raw = entry.get("expires_at")
+    exp = None
+    if exp_raw:
+        try:
+            exp = datetime.fromisoformat(str(exp_raw).replace("Z", "+00:00"))
+        except Exception:
+            exp = None
+    # Skip clearly expired tokens when we know expiry
+    if exp is not None and exp <= now:
+        continue
+    if best is None or (exp is not None and (best_exp is None or exp > best_exp)):
+        best = key
+        best_exp = exp
+
+if best:
+    sys.stdout.write(best)
+PY
+  )"
+  if [ -n "$_xai_from_grok" ]; then
+    export XAI_API_KEY="$_xai_from_grok"
+    export XAI_AUTH_SOURCE="grok-cli-oauth"
+  fi
+  unset _xai_from_grok
+fi
+
+unset _xai_env_file _xai_script_dir
