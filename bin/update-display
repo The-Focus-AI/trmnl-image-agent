@@ -6,6 +6,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$REPO_DIR"
 START_TIME=$(date +%s)
 
 echo "==========================================" >&2
@@ -54,6 +56,8 @@ echo "" >&2
 
 # Summary
 TOTAL_TIME=$((PROC_TIME - START_TIME))
+LATEST_PNG="$REPO_DIR/output/latest.png"
+
 echo "==========================================" >&2
 echo "Complete! Total time: ${TOTAL_TIME}s" >&2
 echo "" >&2
@@ -65,31 +69,92 @@ echo "  Generate: $((GEN_TIME - BUILD_TIME))s" >&2
 echo "  Process:  $((PROC_TIME - GEN_TIME))s" >&2
 echo "" >&2
 echo "Final image: $FINAL_IMAGE" >&2
-echo "Latest:      output/latest.png" >&2
+echo "Latest:      $LATEST_PNG" >&2
 echo "" >&2
 echo "Commit and push to deploy via GitHub Pages" >&2
 echo "==========================================" >&2
 
+# process-image must have written the Pages entrypoint
+if [ ! -f "$LATEST_PNG" ]; then
+  echo "Error: $LATEST_PNG missing after process-image" >&2
+  exit 1
+fi
+if [ ! -f "$FINAL_IMAGE" ]; then
+  echo "Error: final image missing: $FINAL_IMAGE" >&2
+  exit 1
+fi
+
+# Keep local OpenClaw media in sync with the same 1-bit image Pages serves
+OPENCLAW_MEDIA_DIR="$HOME/.openclaw/media/trmnl"
+mkdir -p "$OPENCLAW_MEDIA_DIR"
+cp -f "$LATEST_PNG" "$OPENCLAW_MEDIA_DIR/latest.png"
+
 PUBLISH_ON_SUCCESS="${PUBLISH_ON_SUCCESS:-1}"
 if [ "$PUBLISH_ON_SUCCESS" = "1" ]; then
-  REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-  OPENCLAW_MEDIA_DIR="$HOME/.openclaw/media/trmnl"
+  if ! git -C "$REPO_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo "Error: not a git repository; cannot publish output/latest.png to GitHub" >&2
+    exit 1
+  fi
 
-  mkdir -p "$OPENCLAW_MEDIA_DIR"
-  cp -f "$FINAL_IMAGE" "$OPENCLAW_MEDIA_DIR/latest.png"
+  # Always force-stage the Pages image + this run's dated assets first
+  git -C "$REPO_DIR" add -f -- output/latest.png
+  # FINAL_IMAGE may be relative (output/...) or absolute; normalize for git add
+  case "$FINAL_IMAGE" in
+    /*) FINAL_REL="${FINAL_IMAGE#"$REPO_DIR"/}" ;;
+    *)  FINAL_REL="$FINAL_IMAGE" ;;
+  esac
+  if [ -f "$REPO_DIR/$FINAL_REL" ]; then
+    git -C "$REPO_DIR" add -f -- "$FINAL_REL"
+    # Also stage the full-color source if present next to the processed PNG
+    FULL_CANDIDATE="${FINAL_REL%.png}-full.jpg"
+    FULL_CANDIDATE2="${FINAL_REL%.png}-full.png"
+    [ -f "$REPO_DIR/$FULL_CANDIDATE" ] && git -C "$REPO_DIR" add -f -- "$FULL_CANDIDATE"
+    [ -f "$REPO_DIR/$FULL_CANDIDATE2" ] && git -C "$REPO_DIR" add -f -- "$FULL_CANDIDATE2"
+  fi
 
-  if git -C "$REPO_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    git -C "$REPO_DIR" add output/ bin/ scripts/ package.json package-lock.json trmnl_prompt_builder.py tests/ README.md CLAUDE.md MEMORY.md prompts/ || true
-    if ! git -C "$REPO_DIR" diff --cached --quiet --ignore-submodules --; then
-      git -C "$REPO_DIR" commit -m "Update TRMNL image
+  # Stage other project paths that may change with a pipeline run
+  for path in run.sh setup.sh bin scripts package.json package-lock.json trmnl_prompt_builder.py tests README.md CLAUDE.md MEMORY.md prompts .github; do
+    if [ -e "$REPO_DIR/$path" ]; then
+      git -C "$REPO_DIR" add -- "$path"
+    fi
+  done
+
+  if ! git -C "$REPO_DIR" diff --cached --quiet --ignore-submodules --; then
+    # Require latest.png to be part of the commit when it actually changed
+    if ! git -C "$REPO_DIR" diff --cached --quiet -- output/latest.png; then
+      echo "Staging output/latest.png for GitHub Pages" >&2
+    fi
+    git -C "$REPO_DIR" commit -m "Update TRMNL image
 
 Co-Authored-By: Grok <noreply@x.ai>"
+  else
+    echo "No new git changes to commit" >&2
+  fi
+
+  # Push if we are ahead of upstream (covers this commit and any prior unpushed ones)
+  UPSTREAM="$(git -C "$REPO_DIR" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)"
+  if [ -z "$UPSTREAM" ]; then
+    echo "Pushing main (no upstream set)..." >&2
+    git -C "$REPO_DIR" push -u origin HEAD
+  else
+    AHEAD="$(git -C "$REPO_DIR" rev-list --count "${UPSTREAM}..HEAD" 2>/dev/null || echo 0)"
+    if [ "${AHEAD:-0}" -gt 0 ]; then
+      echo "Pushing $AHEAD commit(s) to $UPSTREAM..." >&2
       git -C "$REPO_DIR" push
-      echo "Published latest TRMNL image to GitHub Pages" >&2
     else
-      echo "No publishable git changes detected" >&2
+      echo "Remote already has latest commit" >&2
     fi
   fi
+
+  # Verify latest.png is present in HEAD (what Pages will deploy from main)
+  if ! git -C "$REPO_DIR" cat-file -e "HEAD:output/latest.png" 2>/dev/null; then
+    echo "Error: output/latest.png is not in HEAD after publish" >&2
+    exit 1
+  fi
+  echo "Published output/latest.png to GitHub (Pages workflow deploys on push to main)" >&2
+  echo "Pages URL: https://the-focus-ai.github.io/trmnl-image-agent/latest.png" >&2
+else
+  echo "Skipping GitHub publish (PUBLISH_ON_SUCCESS=$PUBLISH_ON_SUCCESS)" >&2
 fi
 
 # Output the final image path for scripting (only stdout line)
