@@ -25,7 +25,14 @@ fi
 
 # Run the modular update script (fetch → parse → prompt → generate → process → publish)
 # bin/update-display commits output/latest.png and pushes to origin so Pages can serve it.
-FINAL_IMAGE=$("$SCRIPT_DIR/bin/update-display")
+# Only the last stdout line is the image path (ignore any accidental earlier leaks).
+FINAL_IMAGE=$("$SCRIPT_DIR/bin/update-display" | tail -n 1 | tr -d '\r')
+# Normalize relative paths against the repo root (this script may be invoked from anywhere)
+case "$FINAL_IMAGE" in
+    /*) ;;
+    "") ;;
+    *) FINAL_IMAGE="$SCRIPT_DIR/$FINAL_IMAGE" ;;
+esac
 
 if [ -z "$FINAL_IMAGE" ] || [ ! -f "$FINAL_IMAGE" ]; then
     echo "Error: pipeline did not produce a final image" >&2

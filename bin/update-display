@@ -16,8 +16,10 @@ echo "==========================================" >&2
 echo "" >&2
 
 # Step 1: Fetch all raw data in parallel
+# fetch-all prints the data dir on stdout for scripting — discard so this
+# script's only stdout line remains the final image path (run.sh captures it).
 echo "Step 1/5: Fetching raw data (parallel)..." >&2
-"$SCRIPT_DIR/fetch-all"
+"$SCRIPT_DIR/fetch-all" > /dev/null
 FETCH_TIME=$(date +%s)
 echo "  Done in $((FETCH_TIME - START_TIME))s" >&2
 echo "" >&2
