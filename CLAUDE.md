@@ -42,7 +42,7 @@ The dashboard now uses an overlapping **season stack** instead of a single hard 
 - **Backdrop season**: deep winter, late winter, spring transition, green-up, high summer, harvest, leaf-fall
 - **Operational regimes**: ski, sap, frost, planting, harvest, pollen, school, heat, storm
 - **Primary story**: the highest-priority actionable regime becomes the headline
-- **Style of the week**: deterministic weekly rotation across monochrome-friendly styles
+- **Style of the week**: deterministic weekly rotation across monochrome-friendly styles (WPA, trail poster, chalkboard, stencil, Swiss, comic ink, woodcut, field guide, etc.)
 
 The prompt builder (`trmnl_prompt_builder.py`) scores active regimes using date, live weather, school events, planting calendar, pollen calendar, and Mohawk status. The generated prompt then asks the image model to show overlapping realities in a single coherent layout.
 

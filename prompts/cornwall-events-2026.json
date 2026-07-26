@@ -1,27 +1,58 @@
 {
   "_meta": {
     "year": 2026,
-    "source": "https://cornwallct.org/community/coming-events/",
-    "notes": "Cornwall CT town events calendar. Tier: 3=major community event, 2=notable fun event, 1=recurring/mild interest, 0=government meeting (don't show on TRMNL)",
-    "last_fetched": "2026-06-04"
+    "source": "Cornwall Chronicle July 2026 (cornwallchronicle.org/wp-content/uploads/July_2026.pdf); cornwallct.org calendar notes",
+    "notes": "Cornwall CT town events. Tier: 3=major community event, 2=notable fun event, 1=recurring/mild interest, 0=government meeting (don't show on TRMNL). day_of_week uses Python weekday: Mon=0 … Sun=6. Farmers markets are Saturdays (5).",
+    "last_fetched": "2026-07-25"
   },
   "events": [
     {"date": "2026-06-06", "tier": 3, "label": "MILITIA DAYS", "description": "Revolutionary War reenactment on the Town Green", "time": "Sat 10AM-9PM"},
     {"date": "2026-06-07", "tier": 3, "label": "MILITIA DAYS", "description": "Day 2 — encampment continues", "time": "Sun 9AM-1:30PM"},
     {"date": "2026-06-07", "tier": 2, "label": "MUTT SHOW @ LIME ROCK", "description": "Little Guild's Annual Great Country Mutt Show", "time": "11AM-2:30PM"},
-    {"date": "2026-06-10", "tier": 1, "label": "SENIOR LUNCH", "description": "Community/Senior Lunch @ UCC Parish House", "time": "12-1PM"},
-    {"date": "2026-06-10", "tier": 1, "label": "TEA WITH HONEY", "description": "Chinese tea ceremony @ Cornwall Market", "time": "4-6PM"},
-    {"date": "2026-06-12", "tier": 2, "label": "DAD & KID BUILD DAY", "description": "Father & Child Build & Paint wooden race car @ Town Hall", "time": "5-6PM"},
-    {"date": "2026-06-13", "tier": 2, "label": "OPEN HOUSE HIKE", "description": "Hike the Matland Preserve (CT Open House Day)", "time": "10-11:30AM"},
-    {"date": "2026-06-17", "tier": 1, "label": "SOCIAL HOUR", "description": "Community Social Hour @ UCC Parish House", "time": "2-3PM"},
-    {"date": "2026-06-19", "tier": 3, "label": "BOOKS & BLOOMS", "description": "Talk & Cocktail Reception with Jonathan Galassi @ Library", "time": "5-7PM"},
-    {"date": "2026-06-20", "tier": 2, "label": "CORNWALL MUSIC BOWL", "description": "All-day music @ Cornwall Market", "time": "All day"},
-    {"date": "2026-06-20", "tier": 0, "label": "HAZ WASTE DAY", "description": "Household Hazardous Waste @ Falls Village Garage", "time": "9AM-12PM"},
-    {"date": "2026-06-25", "tier": 2, "label": "SUMMER READING KICKOFF", "description": "Summer Reading Program Kickoff @ Library", "time": "TBD"},
-    {"date": "2026-07-04", "tier": 3, "label": "AMERICA 250 PARADE", "description": "America's 250th Anniversary Parade in Cornwall Village", "time": "All day"}
+    {"date": "2026-07-04", "tier": 3, "label": "AMERICA 250 PARADE", "description": "America's 250th Anniversary Parade; Sam Waterston speaks after", "time": "Lineup 2:30PM, parade ~3PM"},
+    {"date": "2026-07-04", "tier": 2, "label": "ICE CREAM SOCIAL", "description": "Ice Cream Social @ Cornwall Historical Society, 7 Pine St", "time": "1-4PM"},
+    {"date": "2026-07-11", "tier": 2, "label": "BALLYHACK HIKE", "description": "Explore the Ballyhack Preserve with Jean Bouteiller", "time": "10-11AM"},
+    {"date": "2026-07-12", "tier": 3, "label": "JULY FEST", "description": "Music, food trucks, games on the Town Green", "time": "3-8PM"},
+    {"date": "2026-07-12", "tier": 2, "label": "GARDENER'S LAB", "description": "Botanical artist April Stewart Klausner studio morning", "time": "11AM-12:30PM"},
+    {"date": "2026-07-15", "tier": 2, "label": "JUGGLE BOY @ LIBRARY", "description": "Michael Hilby: The Skinny German Juggle Boy", "time": "1-2PM"},
+    {"date": "2026-07-16", "tier": 1, "label": "cARTIE ART BUS", "description": "cARTie Art Museum Bus @ Library", "time": "11AM-1PM"},
+    {"date": "2026-07-17", "tier": 1, "label": "BLACK BEARS TALK", "description": "Black Bears with Ginny Apple @ Library", "time": "10-11AM"},
+    {"date": "2026-07-18", "tier": 2, "label": "AUTHOR TALK", "description": "Rebecca Chace: Talking to the Wolf @ Library", "time": "5PM"},
+    {"date": "2026-07-18", "tier": 2, "label": "RUMMAGE SALE", "description": "Cornwall Rummage Sale opens", "time": "9AM-Noon"},
+    {"date": "2026-07-19", "tier": 2, "label": "RUMMAGE SALE", "description": "Cornwall Rummage Sale continues", "time": "11AM-2PM"},
+    {"date": "2026-07-20", "tier": 2, "label": "RUMMAGE SALE", "description": "Cornwall Rummage Sale continues", "time": "9AM-Noon"},
+    {"date": "2026-07-24", "tier": 1, "label": "GARDENER'S GAB", "description": "Gardener's Gab at the Pink House", "time": "10-11:30AM"},
+    {"date": "2026-07-25", "tier": 3, "label": "PICNIC & DANCE", "description": "Colonial Era picnic & dance @ Foote Field — bring picnic, dancing from 7PM", "time": "6-8PM"},
+    {"date": "2026-07-25", "tier": 2, "label": "STUDIO TALK", "description": "Carl D'Alvia studio talk @ Library", "time": "5PM"},
+    {"date": "2026-07-30", "tier": 2, "label": "WHALEMOBILE", "description": "The Whalemobile at Town Hall — climb aboard a whale", "time": "1-3PM"},
+    {"date": "2026-07-31", "tier": 2, "label": "PINOCCHIO PLAY", "description": "Grumbling Gryphons: The Adventures of Pinocchio @ 29 Lake Rd, West Cornwall", "time": "5:30PM"},
+    {"date": "2026-08-01", "tier": 3, "label": "SUMMER PARTY & AUCTION", "description": "Summer party and auction", "time": "5:30-8:30PM"},
+    {"date": "2026-08-01", "tier": 2, "label": "BOOK TALK", "description": "Adam Van Doren: In the Founders' Footsteps @ Library", "time": "4PM"},
+    {"date": "2026-08-01", "tier": 2, "label": "HIDDEN HISTORIES WALK", "description": "Hidden Histories Walking Tour with Doug Gold (RSVP)", "time": "10AM"},
+    {"date": "2026-08-07", "tier": 3, "label": "ROSE ALGRANT ART SHOW", "description": "Friends of Rose Algrant Art Show opens", "time": "All day"},
+    {"date": "2026-08-08", "tier": 3, "label": "TASTE OF CORNWALL", "description": "5th Taste of Cornwall — America 250 themed on the Town Green", "time": "4-8PM"},
+    {"date": "2026-08-09", "tier": 3, "label": "ROSE ALGRANT ART SHOW", "description": "Friends of Rose Algrant Art Show continues", "time": "All day"},
+    {"date": "2026-08-15", "tier": 2, "label": "MILITIA OUTFITTING", "description": "Warren Stevens Militia Outfitting @ Cornwall Historical Society", "time": "1-3PM"},
+    {"date": "2026-08-21", "tier": 3, "label": "N. CORNWALL MEETING HOUSE 200TH", "description": "200th anniversary — lecture, concert & reception (see uccincornwall.org)", "time": "Weekend"},
+    {"date": "2026-08-22", "tier": 3, "label": "N. CORNWALL MEETING HOUSE 200TH", "description": "200th anniversary weekend continues", "time": "Weekend"},
+    {"date": "2026-08-23", "tier": 3, "label": "N. CORNWALL MEETING HOUSE 200TH", "description": "Special worship / closing events", "time": "Weekend"},
+    {"date": "2026-09-12", "tier": 3, "label": "AG FAIR", "description": "Agricultural Commission Ag Fair — quilts and 9/11 25th anniversary", "time": "10AM-3PM"}
   ],
   "recurring": [
-    {"day_of_week": 6, "label": "FARMERS MARKET", "description": "Cornwall COOP Farm Market on Pine Street", "time": "9AM-12PM", "tier": 1},
-    {"day_of_week": 4, "label": "STORYBOOK HOUR", "description": "Storybook Hour with Rita Delgado @ Library", "time": "10:30AM-12PM", "tier": 1}
+    {
+      "day_of_week": 5,
+      "label": "FARMERS MARKET",
+      "description": "Cornwall COOP Farm Market on Pine St (Village Green); West Cornwall market 10AM-1PM at Wish House",
+      "time": "9AM-12PM",
+      "tier": 1,
+      "months": [5, 6, 7, 8, 9, 10]
+    },
+    {
+      "day_of_week": 3,
+      "label": "STORYBOOK HOUR",
+      "description": "Storybook Hour with Rita Delgado @ Library",
+      "time": "10:30AM-12PM",
+      "tier": 1
+    }
   ]
 }

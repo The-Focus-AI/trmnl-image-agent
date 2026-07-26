@@ -7,62 +7,143 @@ from zoneinfo import ZoneInfo
 
 ET = ZoneInfo("America/New_York")
 
+# Style of the week: pure black/white e-ink friendly treatments.
+# Prefer solid fills, thick outlines, and sparse texture over dense hatch/gray that collapses after thresholding.
 STYLE_LIBRARY = {
     "woodcut_almanac": {
         "style_id": "woodcut_almanac",
         "name": "Woodcut Almanac",
-        "prompt": "Bold woodcut / linocut almanac print with carved black linework, rustic authority, thick hatching, broad poster shapes, and very legible hand-set text.",
+        "prompt": (
+            "Bold woodcut / linocut almanac print: large carved black masses, thick outlines, "
+            "and only sparse cross-hatching for shade. Rustic authority, broad poster shapes, "
+            "hand-set lettering. Avoid fine etch textures and midtone gray."
+        ),
         "board_material": "carved notice board",
     },
     "swiss_weather_board": {
         "style_id": "swiss_weather_board",
         "name": "Swiss Weather Board",
-        "prompt": "Swiss modernist weather board with rigid grid, asymmetrical information hierarchy, geometric icons, strong whitespace, and crystal-clear labels.",
+        "prompt": (
+            "Swiss modernist weather board: rigid grid, asymmetrical hierarchy, geometric icons, "
+            "strong whitespace, and crystal-clear labels. Flat ink only — no gradients, no soft shade."
+        ),
         "board_material": "precision information panel",
     },
     "field_guide_plate": {
         "style_id": "field_guide_plate",
         "name": "Field Guide Plate",
-        "prompt": "Naturalist field-guide plate with labeled observations, specimen-like callouts, measured diagrams, and calm scientific clarity.",
+        "prompt": (
+            "Naturalist field-guide plate: bold specimen silhouettes, simple measured callouts, "
+            "calm scientific clarity. Prefer solid black forms and thick contour lines over fine stipple."
+        ),
         "board_material": "annotated field guide card",
     },
     "wpa_rural_poster": {
         "style_id": "wpa_rural_poster",
         "name": "WPA Rural Poster",
-        "prompt": "WPA-era rural poster with heroic silhouettes, bold flat composition, strong directional shapes, and punchy civic typography.",
+        "prompt": (
+            "WPA-era rural poster: heroic silhouettes, bold flat composition, strong directional shapes, "
+            "and punchy civic typography. Solid black and white poster inks only."
+        ),
         "board_material": "public works placard",
-    },
-    "newspaper_engraving": {
-        "style_id": "newspaper_engraving",
-        "name": "Newspaper Engraving",
-        "prompt": "Dramatic newspaper engraving with etched textures, illustrated-reportage energy, deep contrast, and headline urgency.",
-        "board_material": "engraved news panel",
     },
     "general_store_broadside": {
         "style_id": "general_store_broadside",
         "name": "General Store Broadside",
-        "prompt": "New England general-store broadside with practical poster lettering, local bulletin charm, ornamental dividers, and civic-town notice energy.",
+        "prompt": (
+            "New England general-store broadside: practical poster lettering, local bulletin charm, "
+            "simple ornamental dividers, and civic-town notice energy. High contrast wood-type print."
+        ),
         "board_material": "broadside announcement panel",
     },
     "bauhaus_instrument_panel": {
         "style_id": "bauhaus_instrument_panel",
         "name": "Bauhaus Instrument Panel",
-        "prompt": "Bauhaus instrument panel with circles, bars, arrows, severe contrast, device-like precision, and unmistakable signal graphics.",
+        "prompt": (
+            "Bauhaus instrument panel: circles, bars, arrows, severe contrast, device-like precision, "
+            "and unmistakable signal graphics. Pure geometric black shapes on white."
+        ),
         "board_material": "instrument cluster panel",
     },
     "japanese_seasonal_card": {
         "style_id": "japanese_seasonal_card",
         "name": "Japanese Seasonal Card",
-        "prompt": "Minimal Japanese seasonal card with restrained composition, elegant negative space, light pattern rhythm, and quiet poetic detail while preserving clear text.",
+        "prompt": (
+            "Minimal Japanese seasonal card: restrained composition, elegant negative space, "
+            "a few bold brush-like black shapes, and quiet rhythm while keeping text large and clear."
+        ),
         "board_material": "seasonal notice card",
+    },
+    "stencil_cutout": {
+        "style_id": "stencil_cutout",
+        "name": "Stencil Cutout",
+        "prompt": (
+            "Street stencil / cut-paper poster: hard-edged silhouettes, bridge-connected stencil letters, "
+            "layered solid black shapes, zero hatching. Feels hand-sprayed but perfectly binary."
+        ),
+        "board_material": "stenciled notice board",
+    },
+    "midcentury_trail_poster": {
+        "style_id": "midcentury_trail_poster",
+        "name": "Midcentury Trail Poster",
+        "prompt": (
+            "Mid-century national-park / trail-poster: simplified landforms, flat tree and hill silhouettes, "
+            "clean map-like icons, and confident sans-serif titles. Travel-poster clarity with pure B&W fills."
+        ),
+        "board_material": "trail-map placard",
+    },
+    "chalkboard_menu": {
+        "style_id": "chalkboard_menu",
+        "name": "Chalkboard Menu",
+        "prompt": (
+            "Cafe chalkboard menu board: large chalk-white lettering on solid black panels, "
+            "simple chalk icons, framed sections, and friendly hand-lettered hierarchy. "
+            "Invert freely for contrast but stay pure black and pure white only."
+        ),
+        "board_material": "chalkboard menu panel",
+    },
+    "comic_ink_panel": {
+        "style_id": "comic_ink_panel",
+        "name": "Comic Ink Panel",
+        "prompt": (
+            "Bold comic-ink panel: thick brush outlines, flat solid fills, simple panel borders, "
+            "and punchy display lettering. Cartoon clarity without gray screentones or crosshatch mud."
+        ),
+        "board_material": "comic caption board",
     },
 }
 
+# Five styles per season → 5-week cycle; order differs so the same ISO week
+# does not land on the same treatment in every season.
 STYLE_POOLS = {
-    "winter": ["woodcut_almanac", "newspaper_engraving", "swiss_weather_board", "general_store_broadside"],
-    "spring": ["field_guide_plate", "japanese_seasonal_card", "swiss_weather_board", "bauhaus_instrument_panel"],
-    "summer": ["wpa_rural_poster", "field_guide_plate", "swiss_weather_board", "bauhaus_instrument_panel"],
-    "autumn": ["woodcut_almanac", "general_store_broadside", "newspaper_engraving", "swiss_weather_board"],
+    "winter": [
+        "woodcut_almanac",
+        "stencil_cutout",
+        "bauhaus_instrument_panel",
+        "swiss_weather_board",
+        "midcentury_trail_poster",
+    ],
+    "spring": [
+        "field_guide_plate",
+        "japanese_seasonal_card",
+        "comic_ink_panel",
+        "stencil_cutout",
+        "swiss_weather_board",
+    ],
+    "summer": [
+        "wpa_rural_poster",
+        "midcentury_trail_poster",
+        "chalkboard_menu",
+        "bauhaus_instrument_panel",
+        "field_guide_plate",
+    ],
+    "autumn": [
+        "general_store_broadside",
+        "woodcut_almanac",
+        "comic_ink_panel",
+        "wpa_rural_poster",
+        "chalkboard_menu",
+    ],
 }
 
 POLLEN_LEVELS = {"none": 0, "low": 1, "moderate": 2, "high": 3, "very_high": 4}
@@ -271,25 +352,34 @@ def find_upcoming_events(town: dict, now: dt.date, max_days: int = 21):
                 "tier": tier,
             })
 
-    # Also check recurring events (farmers market, storybook hour)
+    # Also check recurring events (farmers market, storybook hour).
+    # day_of_week uses Python weekday: Mon=0 … Sun=6 (Saturday=5).
     today_weekday = now.weekday()
     for item in recurring:
         dow = item.get("day_of_week")
-        if dow is not None:
-            # Find next occurrence within max_days
-            days_ahead = (dow - today_weekday) % 7
-            if days_ahead == 0:
-                days_ahead = 7  # Next week, not today
-            if days_ahead <= max_days:
-                d = now + dt.timedelta(days=days_ahead)
-                candidates.append({
-                    "date": d,
-                    "days_off": days_ahead,
-                    "label": item.get("label", ""),
-                    "description": item.get("description", ""),
-                    "time": item.get("time", ""),
-                    "tier": 1,
-                })
+        if dow is None:
+            continue
+        months = item.get("months")
+        # Include today when it falls on the recurring day (do not skip to next week).
+        days_ahead = (dow - today_weekday) % 7
+        if days_ahead <= max_days:
+            d = now + dt.timedelta(days=days_ahead)
+            if months and d.month not in months:
+                # Try the following week if this occurrence is out of season.
+                d2 = d + dt.timedelta(days=7)
+                if (d2 - now).days <= max_days and d2.month in months:
+                    d = d2
+                    days_ahead = (d - now).days
+                else:
+                    continue
+            candidates.append({
+                "date": d,
+                "days_off": days_ahead,
+                "label": item.get("label", ""),
+                "description": item.get("description", ""),
+                "time": item.get("time", ""),
+                "tier": item.get("tier", 1),
+            })
 
     if not candidates:
         return None
