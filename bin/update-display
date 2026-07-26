@@ -126,7 +126,7 @@ if [ "$PUBLISH_ON_SUCCESS" = "1" ]; then
     fi
     git -C "$REPO_DIR" commit -m "Update TRMNL image
 
-Co-Authored-By: Grok <noreply@x.ai>"
+Co-Authored-By: Grok <noreply@x.ai>" >&2
   else
     echo "No new git changes to commit" >&2
   fi
@@ -135,12 +135,13 @@ Co-Authored-By: Grok <noreply@x.ai>"
   UPSTREAM="$(git -C "$REPO_DIR" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)"
   if [ -z "$UPSTREAM" ]; then
     echo "Pushing main (no upstream set)..." >&2
-    git -C "$REPO_DIR" push -u origin HEAD
+    # Keep stdout clean: run.sh captures only the final image path from this script
+    git -C "$REPO_DIR" push -u origin HEAD >&2
   else
     AHEAD="$(git -C "$REPO_DIR" rev-list --count "${UPSTREAM}..HEAD" 2>/dev/null || echo 0)"
     if [ "${AHEAD:-0}" -gt 0 ]; then
       echo "Pushing $AHEAD commit(s) to $UPSTREAM..." >&2
-      git -C "$REPO_DIR" push
+      git -C "$REPO_DIR" push >&2
     else
       echo "Remote already has latest commit" >&2
     fi
