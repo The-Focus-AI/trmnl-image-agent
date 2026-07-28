@@ -7,6 +7,7 @@
 #   2. Project .env
 #   3. 1Password (optional): op://Development/xAI API Key/credential
 #   4. Grok CLI OAuth session: ~/.grok/auth.json (access token under "key")
+#      Expired tokens are refreshed via OIDC refresh_token when possible.
 
 _xai_env_file="${XAI_ENV_FILE:-}"
 if [ -z "$_xai_env_file" ]; then
@@ -30,11 +31,15 @@ fi
 
 if [ -z "${XAI_API_KEY:-}" ] && [ -f "${HOME}/.grok/auth.json" ]; then
   # Prefer a non-expired OIDC access token from the Grok Build / grok CLI session.
+  # If expired (or near expiry) but a refresh_token is present, refresh silently and
+  # rewrite ~/.grok/auth.json so subsequent cron runs keep working.
   _xai_from_grok="$(
     python3 - <<'PY'
 import json
 import sys
-from datetime import datetime, timezone
+import urllib.parse
+import urllib.request
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 path = Path.home() / ".grok" / "auth.json"
@@ -44,30 +49,95 @@ except Exception:
     sys.exit(0)
 
 now = datetime.now(timezone.utc)
-best = None
+# Refresh a few minutes early so long pipelines don't race expiry mid-run.
+skew = timedelta(minutes=5)
+
+def parse_exp(raw):
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+best_key = None
 best_exp = None
-for entry in data.values() if isinstance(data, dict) else []:
+refresh_candidate = None  # (dict_key, entry, exp)
+
+for dkey, entry in (data.items() if isinstance(data, dict) else []):
     if not isinstance(entry, dict):
         continue
     key = entry.get("key") or entry.get("access_token")
     if not key:
         continue
-    exp_raw = entry.get("expires_at")
-    exp = None
-    if exp_raw:
-        try:
-            exp = datetime.fromisoformat(str(exp_raw).replace("Z", "+00:00"))
-        except Exception:
-            exp = None
-    # Skip clearly expired tokens when we know expiry
-    if exp is not None and exp <= now:
+    exp = parse_exp(entry.get("expires_at"))
+    if exp is not None and exp <= now + skew:
+        if entry.get("refresh_token") and entry.get("oidc_client_id"):
+            if refresh_candidate is None or (
+                exp is not None
+                and (refresh_candidate[2] is None or exp > refresh_candidate[2])
+            ):
+                refresh_candidate = (dkey, entry, exp)
         continue
-    if best is None or (exp is not None and (best_exp is None or exp > best_exp)):
-        best = key
+    if best_key is None or (exp is not None and (best_exp is None or exp > best_exp)):
+        best_key = key
         best_exp = exp
 
-if best:
-    sys.stdout.write(best)
+if best_key:
+    sys.stdout.write(best_key)
+    sys.exit(0)
+
+if not refresh_candidate:
+    sys.exit(0)
+
+dkey, entry, _exp = refresh_candidate
+client_id = entry.get("oidc_client_id")
+refresh = entry.get("refresh_token")
+issuer = (entry.get("oidc_issuer") or "https://auth.x.ai").rstrip("/")
+
+try:
+    cfg = json.loads(
+        urllib.request.urlopen(
+            f"{issuer}/.well-known/openid-configuration", timeout=30
+        ).read()
+    )
+    token_url = cfg.get("token_endpoint") or f"{issuer}/oauth2/token"
+    body = urllib.parse.urlencode(
+        {
+            "grant_type": "refresh_token",
+            "refresh_token": refresh,
+            "client_id": client_id,
+        }
+    ).encode()
+    req = urllib.request.Request(
+        token_url,
+        data=body,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        payload = json.loads(resp.read().decode())
+except Exception:
+    sys.exit(0)
+
+access = payload.get("access_token")
+if not access:
+    sys.exit(0)
+
+expires_in = int(payload.get("expires_in") or 3600)
+expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+entry["key"] = access
+entry["expires_at"] = expires_at.isoformat().replace("+00:00", "Z")
+if payload.get("refresh_token"):
+    entry["refresh_token"] = payload["refresh_token"]
+data[dkey] = entry
+try:
+    path.write_text(json.dumps(data, indent=2) + "\n")
+    path.chmod(0o600)
+except Exception:
+    pass
+
+sys.stdout.write(access)
 PY
   )"
   if [ -n "$_xai_from_grok" ]; then
