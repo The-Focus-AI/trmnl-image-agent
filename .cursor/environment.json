@@ -1,0 +1,4 @@
+{
+  "name": "TRMNL Image Agent",
+  "install": "npm install --no-fund --no-audit && pip3 install --user -r requirements.txt"
+}
