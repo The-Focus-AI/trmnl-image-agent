@@ -1,0 +1,4 @@
+{
+  "name": "TRMNL Image Agent",
+  "install": "npm install --no-fund --no-audit\npip3 install --user -r requirements.txt\nnpm install -g --prefix \"$(dirname \"$(dirname \"$(command -v node)\")\")\" @xai-official/grok"
+}
