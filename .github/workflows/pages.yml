@@ -29,8 +29,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      # Repo is ~2GB of historical images. A full checkout hangs past
+      # timeout-minutes and never deploys. Only latest.png is published.
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+          sparse-checkout: output/latest.png
+          sparse-checkout-cone-mode: false
 
       - name: Setup Pages
         uses: actions/configure-pages@v6
