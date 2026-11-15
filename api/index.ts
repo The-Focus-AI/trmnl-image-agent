@@ -31,6 +31,12 @@ export async function GET(request: Request): Promise<Response> {
       'Cache-Control': hasCustomQuery
         ? 'private, no-store'
         : 'public, s-maxage=900, stale-while-revalidate=86400',
+      'X-Dispatch-Date': edition.dateLabel,
+      'X-Dispatch-Edition': edition.editionLabel,
+      'X-Dispatch-Archetype': edition.archetype,
+      'X-Dispatch-Spotlight': edition.seasonalSpotlight.windowId,
+      'X-Dispatch-Provider': edition.routingMeta.decisionProvider,
+      'X-Dispatch-Chronicle': edition.routingMeta.chronicleIssue ?? '',
     },
   });
 }

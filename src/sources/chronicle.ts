@@ -310,7 +310,7 @@ export async function getChronicleDigest(requestOrigin?: string): Promise<Chroni
     !requestOrigin.includes('127.0.0.1')
   ) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 18_000);
+    const timer = setTimeout(() => controller.abort(), 32_000);
     try {
       const res = await fetch(`${requestOrigin}/api/chronicle`, {
         signal: controller.signal,
