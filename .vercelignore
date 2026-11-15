@@ -1,0 +1,14 @@
+output/
+prompts/
+bin/
+reports/
+scripts/
+tests/
+trmnl_prompt_builder.py
+run.sh
+setup.sh
+MEMORY.md
+.agents/
+.claude/
+.github/
+*.tar.gz

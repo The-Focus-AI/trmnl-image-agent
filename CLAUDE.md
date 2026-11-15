@@ -1,0 +1,75 @@
+# TRMNL Image Agent
+
+Project for generating custom images for TRMNL e-ink displays.
+
+## How It Works
+
+Images are served via **GitHub Pages** using the **Image Display plugin**:
+
+1. Generate image → process for e-ink → copy to `output/latest.png`
+2. Commit and push to GitHub
+3. GitHub Pages deploys automatically
+4. TRMNL pulls from `https://the-focus-ai.github.io/trmnl-image-agent/latest.png`
+
+## Environment Variables
+
+For each variable, first check if it's already set in the environment. If not set, fetch from 1Password using the `op read` command.
+
+| Variable | Sources (first match wins) |
+|----------|----------------------------|
+| XAI_API_KEY | env → `.env` → 1Password `op://Development/xAI API Key/credential` → Grok CLI OAuth (`~/.grok/auth.json`) |
+
+If you use Grok Build / `grok login`, no separate API key is required — the session token is reused for chat + Imagine.
+
+### Optional model overrides
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `TRMNL_PARSE_MODEL` | `grok-4.5` | Chat model used by `bin/parse-data` |
+| `TRMNL_IMAGE_MODEL` | `grok-imagine-image-quality` | Image model used by `bin/generate-image` |
+| `TRMNL_IMAGE_ASPECT` | `16:9` | Aspect ratio for Imagine API |
+| `TRMNL_IMAGE_RESOLUTION` | `1k` | `1k` or `2k` |
+
+## TRMNL Image Limits
+
+800x480 pixels, PNG/JPEG/BMP, max 5MB
+
+## Seasonal Display Modes
+
+The dashboard now uses an overlapping **season stack** instead of a single hard seasonal mode.
+
+### Core model
+- **Backdrop season**: deep winter, late winter, spring transition, green-up, high summer, harvest, leaf-fall
+- **Operational regimes**: ski, sap, frost, planting, harvest, pollen, school, heat, storm
+- **Primary story**: the highest-priority actionable regime becomes the headline
+- **Style of the week**: deterministic weekly rotation across monochrome-friendly styles (WPA, trail poster, chalkboard, stencil, Swiss, comic ink, woodcut, field guide, etc.)
+
+The prompt builder (`trmnl_prompt_builder.py`) scores active regimes using date, live weather, school events, planting calendar, pollen calendar, and Mohawk status. The generated prompt then asks the image model to show overlapping realities in a single coherent layout.
+
+### Planting Calendar
+Static data in `prompts/planting-calendar-zone6a.json` — week-by-week Zone 6a planting guide (Mar-Oct). Used by `bin/build-prompt` for the "PLANT THIS WEEK" info board.
+
+### Pollen Calendar
+Static data in `prompts/pollen-calendar-zone6a.json` — week-by-week Zone 6a typical pollen levels (Mar-Oct). Tracks tree, grass, and weed pollen with levels: none, low, moderate, high, very_high. Shows on the garden info board during spring/summer/fall modes when any pollen type is active.
+
+### School Calendar
+Static data in `prompts/school-calendar.json` — Region 1 school events. Used by `bin/build-prompt` to show upcoming school events (within 3 days) in the banner.
+
+### Frost Risk
+Computed deterministically in `bin/parse-data` based on tonight's low temp during growing season (Mar-May, Sep-Oct). Levels: `hard_freeze` (<=28F), `frost` (<=32F), `light_frost` (<=36F).
+
+## AI Pipeline (Grok / xAI)
+
+| Step | Script | Model / API |
+|------|--------|-------------|
+| Parse raw data → JSON | `bin/parse-data` | `grok-4.5` via `POST /v1/chat/completions` |
+| Generate dashboard image | `bin/generate-image` | `grok-imagine-image-quality` via `POST /v1/images/generations` |
+
+Base URL: `https://api.x.ai/v1`
+
+## Image Processing
+
+The `bin/process-image` script:
+1. Resizes to 800x480
+2. Converts to 1-bit black/white
+3. Copies to `output/latest.png` for GitHub Pages

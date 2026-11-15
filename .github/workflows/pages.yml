@@ -1,0 +1,65 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'output/latest.png'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Newest image wins. A stuck/waiting deploy must not block hourly updates
+# (Aug 2026 outage: one run sat in environment "waiting" for ~2 days and
+# cancelled every subsequent Pages deploy via the concurrency queue).
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Repo is ~2GB of historical images. A full checkout hangs past
+      # timeout-minutes and never deploys. Only latest.png is published.
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+          sparse-checkout: output/latest.png
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v6
+
+      - name: Stage site (only the live image)
+        run: |
+          test -f output/latest.png
+          mkdir -p _site
+          cp output/latest.png _site/latest.png
+          # Bust CDN/browser heuristics with a tiny index that points at the image
+          cat > _site/index.html <<'EOF'
+          <!doctype html>
+          <meta charset="utf-8">
+          <title>TRMNL latest</title>
+          <meta http-equiv="refresh" content="0; url=latest.png">
+          <p><a href="latest.png">latest.png</a></p>
+          EOF
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: '_site'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

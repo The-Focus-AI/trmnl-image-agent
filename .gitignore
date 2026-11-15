@@ -1,0 +1,9 @@
+node_modules/
+.env
+.env.*
+!.env.example
+.vercel/
+dist/
+__pycache__/
+logs/
+*.tar.gz

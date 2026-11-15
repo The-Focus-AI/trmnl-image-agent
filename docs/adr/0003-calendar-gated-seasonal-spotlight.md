@@ -1,0 +1,3 @@
+# Hard Calendar Gates and Bounded Seasonal Spotlight
+
+Rather than letting all seasonal concepts compete in a single float-scoring pile for control of the whole screen (which previously allowed November freeze-thaw days to trigger maple-sap headlines and crowd out community events), TypeScript enforces strict calendar Seasonal Windows before invoking Parallel Decisions. Eligible seasonal items compete only for a bounded Seasonal Spotlight slot alongside permanent weather, Town Dispatches, and a year-round Almanac, reserving full-banner overrides strictly for genuine emergencies, school closures, or major powder days.

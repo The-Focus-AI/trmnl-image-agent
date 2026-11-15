@@ -1,0 +1,22 @@
+{
+  "name": "cornwall-dispatch",
+  "private": true,
+  "type": "module",
+  "description": "The Cornwall Dispatch — 800x480 e-ink storefront broadsheet on Vercel for TRMNL",
+  "scripts": {
+    "dev": "tsx watch src/dev.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "grok-image": "node scripts/grok-image-cli.mjs"
+  },
+  "dependencies": {
+    "@google/genai": "^3.2.0",
+    "dotenv": "^17.2.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.0"
+  }
+}
