@@ -1,0 +1,109 @@
+[tools]
+node = "22"
+op = "2.41.1"
+pnpm = "11.0.8"
+"npm:markdownlint-cli2" = "0.24.0"
+"npm:skills" = "1.7.4"
+"npm:@earendil-works/pi-coding-agent" = "0.80.3"
+gh = "2.96.0"
+ripgrep = "15.2.0"
+fd = "10.4.2"
+fnox = { version = "1.45.0", workflow = "release.yml" }
+
+[env]
+_.file = ".fnox/env"
+
+[tasks.setup]
+description = "Get this checkout ready: verify 1Password service-account token and check declared secrets"
+run = '''
+set -eu
+if [ ! -f fnox.toml ]; then
+  echo "No fnox configuration yet; no token is needed."
+  exit 0
+fi
+OP_ACCOUNT_HOST="${OP_ACCOUNT_HOST:-thefocusai.1password.com}"
+OP_VAULT="Cornwall Dispatch"
+OP_TOKEN_ITEM="trmnl-image-agent service account token"
+
+token_reads_vault() {
+  [ -n "${OP_SERVICE_ACCOUNT_TOKEN:-}" ] && op vault get "$OP_VAULT" >/dev/null 2>&1
+}
+
+if token_reads_vault; then
+  echo "✓ The service account token can read the project vault ($OP_VAULT)."
+else
+  if [ -z "$OP_ACCOUNT_HOST" ]; then
+    echo "Could not verify vault '$OP_VAULT': OP_SERVICE_ACCOUNT_TOKEN is unset or invalid, and OP_ACCOUNT_HOST is not configured yet." >&2
+    echo "  Cloud workspace: provision vault '$OP_VAULT', create '$OP_TOKEN_ITEM', and set OP_SERVICE_ACCOUNT_TOKEN in project secret settings." >&2
+    echo "  Local fallback: set OP_ACCOUNT_HOST=<org>.1password.com after an owner provisions the project vault." >&2
+    exit 1
+  fi
+  echo "No working token here; fetching it with your own 1Password sign-in..."
+  TOKEN="$(env -u OP_SERVICE_ACCOUNT_TOKEN op read "op://$OP_VAULT/$OP_TOKEN_ITEM/credential" --account "$OP_ACCOUNT_HOST" --no-newline 2>/dev/null || true)"
+  if [ -z "$TOKEN" ]; then
+    echo "Could not get the project token." >&2
+    echo "  Cloud workspace: set OP_SERVICE_ACCOUNT_TOKEN in the project's cloud secret settings to the value of '$OP_TOKEN_ITEM', then restart the workspace." >&2
+    echo "  Your own machine: sign in to $OP_ACCOUNT_HOST in the 1Password app, turn on its command-line integration, and ask an owner to add you to this project's group." >&2
+    exit 1
+  fi
+  git check-ignore -q -- .fnox/env || { echo "STOP: .fnox/env is not ignored by git; not writing a token." >&2; exit 1; }
+  if [ -n "$(git ls-files -- .fnox/env)" ]; then
+    echo "STOP: .fnox/env is tracked by git; not writing a token." >&2
+    exit 1
+  fi
+  umask 077
+  mkdir -p .fnox
+  chmod 700 .fnox
+  printf 'OP_SERVICE_ACCOUNT_TOKEN=%s\n' "$TOKEN" > .fnox/env
+  chmod 600 .fnox/env
+  export OP_SERVICE_ACCOUNT_TOKEN="$TOKEN"
+  token_reads_vault || { echo "The fetched token cannot read the project vault; tell the project owner." >&2; exit 1; }
+  echo "✓ Token saved to .fnox/env (ignored by git)."
+fi
+fnox check
+'''
+
+[tasks.install]
+description = "Install project dependencies with frozen lockfile and verify locked agent skills"
+run = '''
+set -eu
+pnpm install --frozen-lockfile
+if [ -d .agents/skills ]; then
+  node scripts/restore-skills.mjs --check
+else
+  node scripts/restore-skills.mjs
+fi
+'''
+
+[tasks.dev]
+description = "Start local Cornwall Dispatch HTTP server with fnox runtime secrets"
+run = "fnox --profile runtime exec -- pnpm run dev"
+
+[tasks.lint]
+description = "Run TypeScript typecheck, Markdown lint, and skill lock validation"
+run = '''
+set -eu
+pnpm run lint
+markdownlint-cli2 "**/*.md"
+node scripts/restore-skills.mjs --validate-lock
+'''
+
+[tasks.test]
+description = "Run Vitest unit and HTTP handler tests"
+run = "pnpm run test"
+
+[tasks.deploy]
+description = "Guarded release path; fails until Vercel project/team IDs and owner release sign-off are configured"
+run = '''
+set -eu
+echo "Deployment is not automated from mise yet: link the Vercel project/team, configure CRON_SECRET + runtime keys, and record owner release approval first (see recipes/vercel.md and docs/testing.md)." >&2
+exit 1
+'''
+
+[tasks."secrets:check"]
+description = "Verify declared secrets resolve"
+run = "fnox check"
+
+[tasks."secrets:list"]
+description = "List declared secrets without resolving values"
+run = "fnox list"

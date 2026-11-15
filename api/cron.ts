@@ -1,7 +1,26 @@
 import 'dotenv/config';
+import { timingSafeEqual } from 'node:crypto';
 import { buildStorefrontEdition } from '../src/synthesize.js';
 
+function isAuthorizedCronRequest(request: Request, cronSecret: string): boolean {
+  const expected = Buffer.from(`Bearer ${cronSecret}`, 'utf8');
+  const actual = Buffer.from(request.headers.get('authorization') ?? '', 'utf8');
+  if (expected.length !== actual.length) return false;
+  return timingSafeEqual(expected, actual);
+}
+
 export async function GET(request: Request): Promise<Response> {
+  const cronSecret = process.env.CRON_SECRET?.trim();
+  if (cronSecret && !isAuthorizedCronRequest(request, cronSecret)) {
+    return Response.json(
+      { ok: false, error: 'Unauthorized' },
+      {
+        status: 401,
+        headers: { 'Cache-Control': 'no-store' },
+      },
+    );
+  }
+
   const url = new URL(request.url);
   const startedAt = Date.now();
 

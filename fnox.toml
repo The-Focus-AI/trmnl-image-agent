@@ -1,0 +1,19 @@
+# fnox.toml — The Cornwall Dispatch (trmnl-image-agent)
+# Declarative secret references only (never store secret values here).
+
+[providers.op]
+type = "1password"
+account = "thefocusai.1password.com"
+vault = "Cornwall Dispatch"
+
+[secrets.PARALLEL_API_KEY]
+provider = "op"
+value = "PARALLEL_API_KEY"
+description = "Parallel Web Systems API (PDF extract, search, /v1/decisions, and /v1beta/chat/completions) — https://platform.parallel.ai"
+
+[secrets.CRON_SECRET]
+provider = "op"
+value = "CRON_SECRET"
+description = "Shared bearer secret authenticating Vercel Cron GET /api/cron"
+
+[profiles.runtime]

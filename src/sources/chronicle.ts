@@ -1,5 +1,6 @@
-import { GoogleGenAI } from '@google/genai';
+import { extractText } from 'unpdf';
 import type { ChronicleDigest } from '../types.js';
+import { parallelChatJson, postParallelJson } from './parallel.js';
 
 const CHRONICLE_HOME = 'https://cornwallchronicle.org/';
 
@@ -7,8 +8,9 @@ const CHRONICLE_HOME = 'https://cornwallchronicle.org/';
 let cachedDigest: { pdfUrl: string; expiresAt: number; digest: ChronicleDigest } | null =
   null;
 
-const CHRONICLE_SCHEMA = {
+const CHRONICLE_SCHEMA: Record<string, unknown> = {
   type: 'object',
+  additionalProperties: false,
   properties: {
     issueLabel: {
       type: 'string',
@@ -17,9 +19,10 @@ const CHRONICLE_SCHEMA = {
     events: {
       type: 'array',
       description:
-        'Community events, talks, fairs, library programs, concerts, walks, and town-wide meetings (exclude routine zoning/wetlands/board administrative meetings). Include both November and Save-the-Date December items.',
+        'Notable public community events: author talks, art openings, fairs, markets, library programs, concerts, guided walks, holiday gatherings, and Annual Town Meetings. STRICTLY EXCLUDE routine municipal board/committee administrative meetings (Board of Selectmen, Board of Finance, P&Z, ZBA, Inland Wetlands, Park & Rec routine Zoom meetings). Include both current-month and Save-the-Date next-month items.',
       items: {
         type: 'object',
+        additionalProperties: false,
         properties: {
           date: {
             type: 'string',
@@ -57,6 +60,7 @@ const CHRONICLE_SCHEMA = {
         '4 to 7 notable local Cornwall civic briefs and feature story takeaways from this issue.',
       items: {
         type: 'object',
+        additionalProperties: false,
         properties: {
           headline: {
             type: 'string',
@@ -76,15 +80,19 @@ const CHRONICLE_SCHEMA = {
         '3 to 5 charming Cornwall nature observations or local history nuggets from Nature Notes, Dog Walk Observations, or feature essays.',
       items: {
         type: 'object',
+        additionalProperties: false,
         properties: {
           title: { type: 'string', description: 'Short title (max 40 chars).' },
           snippet: {
             type: 'string',
             description: 'Vivid 1-2 sentence takeaway (max 165 chars).',
           },
-          byline: { type: 'string', description: 'Author name if credited.' },
+          byline: {
+            type: 'string',
+            description: 'Author name if credited, or empty string "".',
+          },
         },
-        required: ['title', 'snippet'],
+        required: ['title', 'snippet', 'byline'],
       },
     },
   },
@@ -124,25 +132,26 @@ export async function discoverLatestChroniclePdfUrls(): Promise<{
   }
 }
 
-async function fetchPdfAsBase64(url: string): Promise<string | null> {
+async function extractPdfTextDirect(url: string): Promise<string> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 12_000);
+  const timer = setTimeout(() => controller.abort(), 20_000);
   try {
     const res = await fetch(url, { signal: controller.signal });
-    if (!res.ok) return null;
-    const buf = Buffer.from(await res.arrayBuffer());
-    // Guard against huge PDFs (>20MB)
-    if (buf.byteLength > 20 * 1024 * 1024) return null;
-    return buf.toString('base64');
-  } catch {
-    return null;
+    if (!res.ok) return '';
+    const raw = await res.arrayBuffer();
+    if (raw.byteLength > 20 * 1024 * 1024) return '';
+    const { text } = await extractText(new Uint8Array(raw), { mergePages: true });
+    return text.trim();
+  } catch (err) {
+    console.warn(`[chronicle] unpdf failed on ${url}:`, err);
+    return '';
   } finally {
     clearTimeout(timer);
   }
 }
 
 export async function fetchAndParseChronicle(): Promise<ChronicleDigest | null> {
-  const { mainPdfUrl } = await discoverLatestChroniclePdfUrls();
+  const { mainPdfUrl, insertPdfUrls } = await discoverLatestChroniclePdfUrls();
   if (!mainPdfUrl) return cachedDigest?.digest ?? null;
 
   if (
@@ -153,46 +162,124 @@ export async function fetchAndParseChronicle(): Promise<ChronicleDigest | null> 
     return cachedDigest.digest;
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return null;
-
-  const pdfBase64 = await fetchPdfAsBase64(mainPdfUrl);
-  if (!pdfBase64) return cachedDigest?.digest ?? null;
+  const parallelKey = process.env.PARALLEL_API_KEY?.trim();
+  if (!parallelKey) return cachedDigest?.digest ?? null;
 
   try {
-    const client = new GoogleGenAI({ apiKey, apiVersion: 'v1beta' });
-    const interaction = await client.interactions.create({
-      model: 'gemini-4-hydrogen',
-      store: false,
-      input: [
-        {
-          type: 'document',
-          data: pdfBase64,
-          mime_type: 'application/pdf',
-        },
-        {
-          type: 'text',
-          text: `Extract structured community calendar events (including flyers/inserts at the back of the PDF and Save-the-Dates), Cornwall Briefs & local news highlights, and Nature Notes / local history lore from this issue of the Cornwall Chronicle (Cornwall, CT). Exclude dry municipal committee meetings (ZBA, Inland Wetlands, P&Z routine sessions) unless it is a major Town Meeting or public festival. Use exact YYYY-MM-DD dates whenever a specific calendar date is given.`,
-        },
-      ],
-      response_format: {
-        type: 'text',
-        mime_type: 'application/json',
-        schema: CHRONICLE_SCHEMA,
-      },
-    });
+    const allUrls = [mainPdfUrl, ...insertPdfUrls];
+    const directTexts: Array<{ url: string; text: string }> = [];
+    for (const url of allUrls) {
+      directTexts.push({ url, text: await extractPdfTextDirect(url) });
+    }
 
-    const rawText = interaction.output_text;
-    if (!rawText) return cachedDigest?.digest ?? null;
-    const parsed = JSON.parse(rawText);
+    const missingUrls = directTexts.filter((d) => !d.text).map((d) => d.url);
+    if (missingUrls.length > 0) {
+      const extractRes = await postParallelJson<{
+        results?: Array<{ url?: string; full_content?: string; excerpts?: string[] }>;
+      }>(
+        '/v1/extract',
+        {
+          urls: missingUrls,
+          objective:
+            'Extract the issue month/year, all community calendar events and flyers, Cornwall Briefs, and Nature Notes.',
+          advanced_settings: {
+            full_content: { max_chars_per_result: 45_000 },
+          },
+        },
+        parallelKey,
+        12_000,
+      );
+      for (const r of extractRes?.results ?? []) {
+        const slot = directTexts.find((d) => d.url === r.url);
+        if (slot && !slot.text) {
+          slot.text =
+            r.full_content?.trim() ||
+            (Array.isArray(r.excerpts) ? r.excerpts.join('\n').trim() : '');
+        }
+      }
+    }
+
+    const combinedText = directTexts
+      .filter((d) => d.text.length > 0)
+      .map((d) => `### SOURCE PDF: ${d.url}\n${d.text.replace(/[ \t]+/g, ' ')}`)
+      .join('\n\n');
+
+    if (!combinedText) return cachedDigest?.digest ?? null;
+
+    // Parallel /v1beta/chat/completions enforces a 20,000-char limit per message.
+    // Split multi-page issues on line boundaries into <=17,500-char chunks and parse concurrently!
+    const CHUNK_SIZE = 17_500;
+    const cappedText = combinedText.slice(0, CHUNK_SIZE * 3);
+    const chunks: string[] = [];
+    let cursor = 0;
+    while (cursor < cappedText.length) {
+      let end = Math.min(cursor + CHUNK_SIZE, cappedText.length);
+      if (end < cappedText.length) {
+        const nl = cappedText.lastIndexOf('\n', end);
+        if (nl > cursor + CHUNK_SIZE * 0.6) end = nl + 1;
+      }
+      chunks.push(cappedText.slice(cursor, end));
+      cursor = end;
+    }
+
+    const chunkResults = await Promise.all(
+      chunks.map((chunk, idx) =>
+        parallelChatJson<{
+          issueLabel?: string;
+          events?: ChronicleDigest['events'];
+          briefs?: ChronicleDigest['briefs'];
+          natureAndLore?: ChronicleDigest['natureAndLore'];
+        }>({
+          systemPrompt:
+            'You extract structured hyperlocal newspaper digests strictly from the supplied Cornwall Chronicle PDF text without searching the web or inventing facts.',
+          userPrompt: `Extract notable public community calendar events (talks, art shows, fairs, concerts, library programs, walks, holiday events, Annual Town Meeting — EXCLUDE routine Board of Selectmen, Board of Finance, P&Z, ZBA, and Inland Wetlands meetings) and Cornwall Briefs & local news highlights from part ${idx + 1}/${chunks.length} of the Cornwall Chronicle (Cornwall, CT). Use exact YYYY-MM-DD dates whenever a specific calendar date is given.\n\nCORNWALL CHRONICLE PDF TEXT (PART ${idx + 1}/${chunks.length}):\n${chunk}`,
+          schemaName: 'chronicle_digest',
+          schema: CHRONICLE_SCHEMA,
+          model: 'lite',
+          timeoutMs: 28_000,
+        }),
+      ),
+    );
+
+    const validChunks = chunkResults.filter(
+      (r): r is NonNullable<(typeof chunkResults)[number]> => Boolean(r),
+    );
+    if (validChunks.length === 0) return cachedDigest?.digest ?? null;
+
+    const issueLabel =
+      validChunks
+        .map((c) => c.issueLabel?.trim())
+        .find((lbl) => lbl && !/unknown|not specified/i.test(lbl)) ?? 'CURRENT ISSUE';
+
+    const seenEvents = new Set<string>();
+    const mergedEvents: ChronicleDigest['events'] = [];
+    for (const c of validChunks) {
+      for (const ev of c.events ?? []) {
+        const key = `${ev.date}:${ev.title.toLowerCase()}`;
+        if (!seenEvents.has(key)) {
+          seenEvents.add(key);
+          mergedEvents.push(ev);
+        }
+      }
+    }
+
+    const mergedBriefs = validChunks.flatMap((c) => c.briefs ?? []).slice(0, 8);
+    const mergedLore = validChunks
+      .flatMap((c) => c.natureAndLore ?? [])
+      .slice(0, 6)
+      .map((n) => ({
+        title: n.title,
+        snippet: n.snippet,
+        ...(n.byline ? { byline: n.byline } : {}),
+      }));
 
     const digest: ChronicleDigest = {
-      issueLabel: String(parsed.issueLabel ?? 'CURRENT ISSUE'),
+      issueLabel,
       pdfUrl: mainPdfUrl,
       fetchedAt: new Date().toISOString(),
-      events: Array.isArray(parsed.events) ? parsed.events : [],
-      briefs: Array.isArray(parsed.briefs) ? parsed.briefs : [],
-      natureAndLore: Array.isArray(parsed.natureAndLore) ? parsed.natureAndLore : [],
+      events: mergedEvents,
+      briefs: mergedBriefs,
+      natureAndLore: mergedLore,
     };
 
     cachedDigest = {
@@ -203,7 +290,7 @@ export async function fetchAndParseChronicle(): Promise<ChronicleDigest | null> 
 
     return digest;
   } catch (err) {
-    console.error('[chronicle] Gemini PDF parse failed:', err);
+    console.error('[chronicle] Parallel PDF parse failed:', err);
     return cachedDigest?.digest ?? null;
   }
 }
@@ -213,14 +300,15 @@ export async function fetchAndParseChronicle(): Promise<ChronicleDigest | null> 
  * falling back to direct in-process parsing in local dev or on cache warm.
  */
 export async function getChronicleDigest(requestOrigin?: string): Promise<ChronicleDigest | null> {
-  if (
-    cachedDigest &&
-    cachedDigest.expiresAt > Date.now()
-  ) {
+  if (cachedDigest && cachedDigest.expiresAt > Date.now()) {
     return cachedDigest.digest;
   }
 
-  if (requestOrigin && !requestOrigin.includes('localhost') && !requestOrigin.includes('127.0.0.1')) {
+  if (
+    requestOrigin &&
+    !requestOrigin.includes('localhost') &&
+    !requestOrigin.includes('127.0.0.1')
+  ) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 18_000);
     try {

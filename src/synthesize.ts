@@ -1,4 +1,3 @@
-import { GoogleGenAI } from '@google/genai';
 import {
   computeDaypart,
   editionTitleForDaypart,
@@ -10,6 +9,7 @@ import { buildAlmanacData } from './sources/almanac.js';
 import { getChronicleDigest } from './sources/chronicle.js';
 import {
   gatherLiveLocalEvidence,
+  parallelChatJson,
   routeEditionWithDecisions,
 } from './sources/parallel.js';
 import { fetchHousatonicRiver } from './sources/river.js';
@@ -81,8 +81,9 @@ function formatEventWhen(dateStr: string, todayIso: string): string {
     .toUpperCase();
 }
 
-const EDITION_COPY_SCHEMA = {
+const EDITION_COPY_SCHEMA: Record<string, unknown> = {
   type: 'object',
+  additionalProperties: false,
   properties: {
     alertBanner: {
       type: 'string',
@@ -91,6 +92,7 @@ const EDITION_COPY_SCHEMA = {
     },
     leadStory: {
       type: 'object',
+      additionalProperties: false,
       properties: {
         kicker: {
           type: 'string',
@@ -115,6 +117,7 @@ const EDITION_COPY_SCHEMA = {
     },
     weatherCallout: {
       type: 'object',
+      additionalProperties: false,
       properties: {
         summaryLine: {
           type: 'string',
@@ -133,6 +136,7 @@ const EDITION_COPY_SCHEMA = {
         'Exactly 3 short hyperlocal Town Bulletins (Cornwall Briefs, library/town/school/trail news). Keep each punchy so 2 bullets read cleanly from across a store counter.',
       items: {
         type: 'object',
+        additionalProperties: false,
         properties: {
           kicker: { type: 'string', description: 'Short uppercase tag (max 15 chars).' },
           headline: { type: 'string', description: 'Crisp bullet title (max 38 chars).' },
@@ -146,6 +150,7 @@ const EDITION_COPY_SCHEMA = {
       description: 'Exactly 4 upcoming Cornwall community events in chronological order.',
       items: {
         type: 'object',
+        additionalProperties: false,
         properties: {
           whenLabel: {
             type: 'string',
@@ -162,6 +167,7 @@ const EDITION_COPY_SCHEMA = {
     },
     seasonalSpotlight: {
       type: 'object',
+      additionalProperties: false,
       description:
         'Feature box for ONLY the chosen winning SeasonalWindowId. Never invent out-of-season claims.',
       properties: {
@@ -177,18 +183,25 @@ const EDITION_COPY_SCHEMA = {
     },
     almanacFeature: {
       type: 'object',
+      additionalProperties: false,
+      description:
+        'Highlight the single most notable upcoming Cornwall community gathering from the Chronicle calendar (e.g. fair, author talk, art opening, concert, walk, or Town Meeting — NEVER animal trivia and NEVER routine Board/Zoom committee meetings).',
       properties: {
+        whenLabel: {
+          type: 'string',
+          description: 'Uppercase date badge for this featured event, e.g. TODAY, FRI NOV 20, SAT NOV 28 (max 12 chars).',
+        },
         title: {
           type: 'string',
-          description: 'Short Nature Note or Cornwall Lore title (max 28 chars).',
+          description: 'Event title, e.g. Cornwall Reads Cornwall or Holiday Artisans Fair (max 30 chars).',
         },
         note: {
           type: 'string',
           description:
-            'Vivid 1-sentence Cornwall naturalist observation or local curiosity (max 98 chars).',
+            'Venue, time, and 1 crisp detail, e.g. Town Hall, 4 PM — neighbors share local stories & cider (max 90 chars).',
         },
       },
-      required: ['title', 'note'],
+      required: ['whenLabel', 'title', 'note'],
     },
   },
   required: [
@@ -224,7 +237,8 @@ function buildFallbackEditionCopy(params: {
   } = params;
 
   const topBrief = chronicle?.briefs?.[0];
-  const topLore = chronicle?.natureAndLore?.[0];
+  const featuredCalendarEvent =
+    upcomingChronicleEvents.find((ev) => ev.isMajor) ?? upcomingChronicleEvents[0];
 
   const events = upcomingChronicleEvents.slice(0, 4).map((ev) => ({
     whenLabel: formatEventWhen(ev.date, todayIso),
@@ -291,8 +305,19 @@ function buildFallbackEditionCopy(params: {
       body: clamp(winningWindow.factualContext, 110),
     },
     almanacFeature: {
-      title: clamp(topLore?.title ?? 'Field & Trail Notes', 34),
-      note: clamp(topLore?.snippet ?? almanacPhenology, 150),
+      whenLabel: featuredCalendarEvent
+        ? formatEventWhen(featuredCalendarEvent.date, todayIso)
+        : (events[0]?.whenLabel ?? 'COMING UP'),
+      title: clamp(
+        featuredCalendarEvent?.title ?? events[0]?.title ?? 'Cornwall Town Calendar',
+        34,
+      ),
+      note: clamp(
+        featuredCalendarEvent
+          ? `${[featuredCalendarEvent.location, featuredCalendarEvent.time].filter(Boolean).join(' • ')} — ${featuredCalendarEvent.summary}`
+          : (events[0]?.whereAndTime ?? 'CornwallChronicle.org'),
+        102,
+      ),
     },
   };
 }
@@ -381,13 +406,12 @@ export async function buildStorefrontEdition(options?: {
     hasUrgentBanner: routing.hasUrgentBanner,
   });
 
-  // Step 4: Single structured Gemini pass to craft authentic storefront broadsheet copy
-  const geminiKey = process.env.GEMINI_API_KEY;
+  // Step 4: Single structured Parallel Chat pass to craft authentic storefront broadsheet copy
+  const parallelKey = process.env.PARALLEL_API_KEY?.trim();
   let synthesized = fallbackCopy;
 
-  if (geminiKey) {
+  if (parallelKey) {
     try {
-      const client = new GoogleGenAI({ apiKey: geminiKey });
       const contextPayload = {
         todayDate: almanac.fullDateLabel,
         todayIso: clock.dateIso,
@@ -425,9 +449,9 @@ export async function buildStorefrontEdition(options?: {
         liveLocalWebDispatches: [...liveEvidence, ...routing.citations].slice(0, 8),
       };
 
-      const editorialPrompt = `You are the editor of THE CORNWALL DISPATCH, a witty, warm, literary black-and-white storefront broadsheet displayed publicly at a shop counter in Cornwall, Connecticut (Litchfield Hills).
+      const systemPrompt = `You are the editor of THE CORNWALL DISPATCH, a witty, warm, literary black-and-white storefront broadsheet displayed publicly at a shop counter in Cornwall, Connecticut (Litchfield Hills). Synthesize ONLY the provided JSON context without additional web searches.`;
 
-EDITORIAL RULES:
+      const editorialPrompt = `EDITORIAL RULES:
 1. VOICE: Write like a sharp New England village newspaper & Old Farmer's Almanac — specific local place names (West Cornwall, Cornwall Bridge, Pine Street, Cream Hill, Housatonic, CCS, Cornwall Library), crisp verbs, zero AI clichés, zero exclamation-mark hype.
 2. STOREFRONT BOUNDARY: Never include national partisan politics, gruesome crime, or private household-chore commands (never say "cover your plants" or "plan school logistics"). Speak to neighbors, hikers, anglers, and visitors standing at the store counter.
 3. DAYPART FOCUS (${daypart.toUpperCase()}):
@@ -436,24 +460,21 @@ EDITORIAL RULES:
    - evening: Pivot toward tonight's chill/weather, tomorrow's outlook, and upcoming community gatherings.
    - weekend: Highlight weekend outings, trails, Housatonic River / Mohawk conditions, fairs, talks, and markets.
 4. STRICT SEASONAL TRUTH: Your Seasonal Spotlight MUST strictly describe winningSeasonalWindow (${winningWindow.id}: ${winningWindow.label}). NEVER mention maple sap/sugaring unless winningSeasonalWindow.id is "maple_sap". If winningSeasonalWindow.id is "mohawk_ski" and isMohawkSkiOpen is false, frame it as early-winter snowmaking/pre-season mountain watch rather than claiming trails are open.
-5. CHRONOLOGICAL ACCURACY: Only list upcoming events on or after ${clock.dateIso}. Format whenLabel cleanly (e.g. TODAY, FRI NOV 20, SAT NOV 28, SUN DEC 20).
+5. CHRONOLOGICAL ACCURACY & NOTABLE CALENDAR: Only list upcoming events on or after ${clock.dateIso} (format whenLabel cleanly, e.g. TODAY, TUE NOV 17, SAT NOV 28). Exclude routine administrative Zoom/board meetings (Board of Selectmen, Board of Finance, P&Z, ZBA) unless it is the Annual Town Meeting. For almanacFeature, spotlight the single most notable upcoming Cornwall gathering on the calendar (never generic wildlife trivia).
 
 SOURCE CONTEXT JSON:
-${JSON.stringify(contextPayload, null, 2)}`;
+${JSON.stringify(contextPayload).slice(0, 16_500)}`;
 
-      const interaction = await client.interactions.create({
-        model: 'gemini-4-hydrogen',
-        store: false,
-        input: editorialPrompt,
-        response_format: {
-          type: 'text',
-          mime_type: 'application/json',
-          schema: EDITION_COPY_SCHEMA,
-        },
+      const raw = await parallelChatJson<any>({
+        systemPrompt,
+        userPrompt: editorialPrompt,
+        schemaName: 'edition_copy',
+        schema: EDITION_COPY_SCHEMA,
+        model: 'lite',
+        timeoutMs: 22_000,
       });
 
-      if (interaction.output_text) {
-        const raw = JSON.parse(interaction.output_text);
+      if (raw) {
         const bannerRaw = clamp(raw.alertBanner, 54);
         synthesized = {
           alertBanner: routing.hasUrgentBanner && bannerRaw ? bannerRaw : null,
@@ -541,6 +562,11 @@ ${JSON.stringify(contextPayload, null, 2)}`;
             ),
           },
           almanacFeature: {
+            whenLabel: clamp(
+              raw.almanacFeature?.whenLabel,
+              13,
+              fallbackCopy.almanacFeature.whenLabel ?? 'COMING UP',
+            ).toUpperCase(),
             title: clamp(
               raw.almanacFeature?.title,
               30,
@@ -562,7 +588,7 @@ ${JSON.stringify(contextPayload, null, 2)}`;
         }
       }
     } catch (err) {
-      console.error('[synthesize] Gemini copy synthesis failed, using fallback:', err);
+      console.error('[synthesize] Parallel copy synthesis failed, using fallback:', err);
     }
   }
 

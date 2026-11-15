@@ -235,8 +235,9 @@ function renderAlmanacPoster(ed: Edition): string {
       </div>
 
       <div style="border:2.5px solid #000;padding:11px 14px;display:flex;flex-direction:column;min-height:0;overflow:hidden;">
-        <div style="margin-bottom:6px;">
-          <span class="tag-outline">FIELD &amp; NATURE NOTE</span>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;">
+          <span class="tag-outline">ON THE CALENDAR</span>
+          <span style="font-family:var(--font-mono);font-weight:700;font-size:15px;">${escapeHtml(ed.almanacFeature.whenLabel ?? ed.upcomingEvents[0]?.whenLabel ?? 'COMING UP')}</span>
         </div>
         <h2 style="font-family:var(--font-display);font-weight:800;font-size:22px;line-height:1.15;" class="clamp-2">
           ${escapeHtml(ed.almanacFeature.title)}

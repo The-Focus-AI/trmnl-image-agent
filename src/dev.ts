@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { createServer } from 'node:http';
 import { GET as handleChronicle } from '../api/chronicle.js';
 import { GET as handleCron } from '../api/cron.js';
+import { GET as handleHealth } from '../api/health.js';
 import { GET as handleIndex } from '../api/index.js';
 import { GET as handleState } from '../api/state.js';
 
@@ -31,6 +32,9 @@ const server = createServer(async (req, res) => {
         break;
       case '/api/cron':
         webRes = await handleCron(webReq);
+        break;
+      case '/api/health':
+        webRes = await handleHealth();
         break;
       case '/favicon.ico':
         res.writeHead(204);

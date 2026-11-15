@@ -17,17 +17,18 @@ See [GLOSSARY.md](file:///Users/wschenk/The-Focus-AI/trmnl-image-agent/GLOSSARY.
 ## Local Development Recipe
 
 ```bash
-# 1. Install dependencies
-pnpm install
+# 1. Install pinned tools, dependencies, and verify locked agent skills
+mise trust && mise install
+mise run install
 
-# 2. Configure API keys in .env (GEMINI_API_KEY required; PARALLEL_API_KEY recommended)
-cp .env.example .env
+# 2. Verify 1Password secrets ("Cornwall Dispatch" vault in thefocusai.1password.com)
+mise run secrets:check
 
-# 3. Run typecheck & unit tests
-pnpm typecheck && pnpm test
+# 3. Run lint & unit tests
+mise run lint && mise run test
 
-# 4. Start local server (http://localhost:3000)
-pnpm dev
+# 4. Start local server with fnox runtime secrets (http://localhost:3000)
+mise run dev
 ```
 
 ### Local Preview URLs
@@ -36,48 +37,29 @@ pnpm dev
 - **Pin a specific poster or daypart:** `http://localhost:3000/?frame=1&archetype=dispatch&daypart=morning`
 - **Inspect synthesized JSON state:** `http://localhost:3000/api/state`
 - **Inspect parsed monthly *Cornwall Chronicle* PDF digest:** `http://localhost:3000/api/chronicle`
+- **Boolean secret configuration check:** `http://localhost:3000/api/health`
 
 ---
 
-## Vercel Deployment & TRMNL Cutover Recipe
+## Vercel Deployment & TRMNL Setup Recipe
 
-### Phase 1: Deploy to Vercel (Zero Downtime)
-`.vercelignore` excludes legacy `output/` binaries so uploads stay ~40 KB.
+### 1. Deploy to Vercel
 
 ```bash
 # Link & deploy preview
-vercel
+pnpm dlx vercel
 
 # Add secrets to Vercel Production
-vercel env add GEMINI_API_KEY production
-vercel env add PARALLEL_API_KEY production
+pnpm dlx vercel env add PARALLEL_API_KEY production
+pnpm dlx vercel env add CRON_SECRET production
 
 # Deploy production
-vercel --prod
+pnpm dlx vercel --prod
 ```
 
 *(Note: `vercel.json` schedules `/api/cron` daily at `0 11 * * *` (6:00 AM EST) so deployment works on both Vercel Hobby and Pro plans; `/` sets `Cache-Control: public, s-maxage=900, stale-while-revalidate=86400` so every 15-minute TRMNL poll rotates posters at the CDN edge in <100ms.)*
 
-### Phase 2: Point TRMNL Screenshot Plugin at Vercel
+### 2. Point TRMNL Screenshot Plugin at Vercel
 1. Open the TRMNL dashboard (in Safari) → add/configure the **Screenshot** plugin.
 2. Set **URL** to `https://<your-project>.vercel.app/` (no `?frame=1`).
 3. Set **Refresh Interval** to **15 minutes** (cycles through all 4 posters every hour).
-
-### Phase 3: Retire `hermes` & Shrink `.git` (2.4 GB → <1 MB)
-Once the store TRMNL is verified on Vercel:
-
-```bash
-# 1. Stop the hourly cron/job on hermes first so it stops pushing output/latest.png
-
-# 2. Archive existing generated images outside the repository
-tar -czf ~/cornwall-trmnl-archive-$(date +%Y%m%d).tar.gz output/
-
-# 3. Remove legacy scripts/images and create a clean history-free root branch
-rm -rf output bin scripts prompts trmnl_prompt_builder.py test_trmnl_prompt_builder.py
-git checkout --orphan clean-main
-git add -A
-git commit -m "Launch The Cornwall Dispatch on Vercel"
-git branch -M clean-main main
-git push --force origin main
-git reflog expire --expire=now --all && git gc --prune=now --aggressive
-```

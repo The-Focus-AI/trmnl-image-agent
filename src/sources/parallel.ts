@@ -1,4 +1,3 @@
-import { GoogleGenAI } from '@google/genai';
 import {
   defaultArchetypeForDaypart,
   isMohawkWindowOpen,
@@ -28,16 +27,16 @@ const CORNWALL_CORE_URLS = [
 
 const MOHAWK_URL = 'https://www.mohawkmtn.com/snow-report/';
 
-async function postParallelJson<T>(
+export async function postParallelJson<T>(
   path: string,
   body: Record<string, unknown>,
   apiKey: string,
-  timeoutMs = 7500,
+  timeoutMs = 10_000,
 ): Promise<T | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(`${PARALLEL_BASE}${path}`, {
+    let res = await fetch(`${PARALLEL_BASE}${path}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -46,9 +45,23 @@ async function postParallelJson<T>(
       body: JSON.stringify(body),
       signal: controller.signal,
     });
+
+    // Accommodate pak_* Personal Access Keys if an endpoint expects Bearer auth
+    if (res.status === 401 && path.includes('/chat/completions')) {
+      res = await fetch(`${PARALLEL_BASE}${path}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+    }
+
     if (!res.ok) {
       const txt = await res.text().catch(() => '');
-      console.warn(`[parallel] ${path} HTTP ${res.status}: ${txt.slice(0, 200)}`);
+      console.warn(`[parallel] ${path} HTTP ${res.status}: ${txt.slice(0, 240)}`);
       return null;
     }
     return (await res.json()) as T;
@@ -60,137 +73,135 @@ async function postParallelJson<T>(
   }
 }
 
+export async function parallelChatJson<T>(params: {
+  systemPrompt: string;
+  userPrompt: string;
+  schemaName: string;
+  schema: Record<string, unknown>;
+  model?: 'lite' | 'base' | 'core';
+  timeoutMs?: number;
+}): Promise<T | null> {
+  const apiKey = process.env.PARALLEL_API_KEY?.trim();
+  if (!apiKey) return null;
+
+  const {
+    systemPrompt,
+    userPrompt,
+    schemaName,
+    schema,
+    model = 'lite',
+    timeoutMs = 22_000,
+  } = params;
+
+  const res = await postParallelJson<{
+    choices?: Array<{ message?: { content?: string | null } }>;
+  }>(
+    '/v1beta/chat/completions',
+    {
+      model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: schemaName,
+          strict: true,
+          schema,
+        },
+      },
+    },
+    apiKey,
+    timeoutMs,
+  );
+
+  const rawContent = res?.choices?.[0]?.message?.content;
+  if (!rawContent) return null;
+
+  try {
+    return JSON.parse(rawContent) as T;
+  } catch (err) {
+    console.warn(`[parallel] Failed to parse ${schemaName} JSON output:`, err);
+    return null;
+  }
+}
+
 export async function gatherLiveLocalEvidence(
   clock: LocalClock,
 ): Promise<WebEvidenceSnippet[]> {
-  const parallelKey = process.env.PARALLEL_API_KEY;
+  const parallelKey = process.env.PARALLEL_API_KEY?.trim();
+  if (!parallelKey) return [];
+
   const urls = isMohawkWindowOpen(clock)
     ? [...CORNWALL_CORE_URLS, MOHAWK_URL]
     : CORNWALL_CORE_URLS;
 
-  if (parallelKey) {
-    const [extractRes, searchRes] = await Promise.all([
-      postParallelJson<any>(
-        '/v1/extract',
-        {
-          urls,
-          objective: `Extract current ${clock.dateIso} community announcements, upcoming events, library/market programs, school schedule alerts, and ski trail status for Cornwall, Connecticut.`,
-          advanced_settings: {
-            full_content: false,
-          },
-        },
-        parallelKey,
-        7500,
-      ),
-      postParallelJson<any>(
-        '/v1/search',
-        {
-          objective: `Find recent local community news, road/bridge notices, outdoor conditions, and cultural events in Cornwall CT, Region 1 Schools, and Litchfield County around ${clock.dateIso}. Exclude national politics and crime.`,
-          search_queries: [
-            'Cornwall CT news events announcements',
-            'Region 1 schools Cornwall Consolidated Housatonic news',
-            'West Cornwall Cornwall Bridge Litchfield County events',
-          ],
-          mode: 'fast',
-          advanced_settings: {
-            max_results: 6,
-          },
-        },
-        parallelKey,
-        5500,
-      ),
-    ]);
-
-    const snippets: WebEvidenceSnippet[] = [];
-
-    for (const item of extractRes?.results ?? []) {
-      const excerpt = Array.isArray(item.excerpts)
-        ? item.excerpts.join(' ').slice(0, 500)
-        : String(item.full_content ?? '').slice(0, 500);
-      if (excerpt.trim()) {
-        snippets.push({
-          source: 'parallel-extract',
-          url: String(item.url ?? ''),
-          title: String(item.title ?? item.url ?? 'Local Cornwall Page'),
-          excerpt: excerpt.trim(),
-          publishedAt: item.publish_date ? String(item.publish_date) : undefined,
-        });
-      }
-    }
-
-    for (const item of searchRes?.results ?? []) {
-      const excerpt = Array.isArray(item.excerpts)
-        ? item.excerpts.join(' ').slice(0, 420)
-        : '';
-      if (excerpt.trim()) {
-        snippets.push({
-          source: 'parallel-search',
-          url: String(item.url ?? ''),
-          title: String(item.title ?? 'Northwest Corner Dispatch'),
-          excerpt: excerpt.trim(),
-          publishedAt: item.publish_date ? String(item.publish_date) : undefined,
-        });
-      }
-    }
-
-    return snippets;
-  }
-
-  // Fallback when PARALLEL_API_KEY is not set yet: fast Gemini Google Search (bounded to 12s)
-  const geminiKey = process.env.GEMINI_API_KEY;
-  if (!geminiKey) return [];
-
-  try {
-    const client = new GoogleGenAI({ apiKey: geminiKey });
-    const searchPromise = client.interactions.create({
-      model: 'gemini-4-hydrogen',
-      store: false,
-      tools: [{ type: 'google_search' }],
-      input: `Today is ${clock.dateIso}. Search current local news and announcements for Cornwall CT (cornwallct.gov, cornwalllibrary.org, Cornwall Conservation Trust, Region 1 Schools) and return 4 concise, storefront-friendly items. Exclude national politics and crime.`,
-      response_format: {
-        type: 'text',
-        mime_type: 'application/json',
-        schema: {
-          type: 'object',
-          properties: {
-            items: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  url: { type: 'string' },
-                  title: { type: 'string' },
-                  excerpt: { type: 'string' },
-                },
-                required: ['url', 'title', 'excerpt'],
-              },
-            },
-          },
-          required: ['items'],
+  const [extractRes, searchRes] = await Promise.all([
+    postParallelJson<any>(
+      '/v1/extract',
+      {
+        urls,
+        objective: `Extract current ${clock.dateIso} community announcements, upcoming events, library/market programs, school schedule alerts, and ski trail status for Cornwall, Connecticut.`,
+        advanced_settings: {
+          full_content: false,
         },
       },
-    });
+      parallelKey,
+      8500,
+    ),
+    postParallelJson<any>(
+      '/v1/search',
+      {
+        objective: `Find recent local community news, road/bridge notices, outdoor conditions, and cultural events in Cornwall CT, Region 1 Schools, and Litchfield County around ${clock.dateIso}. Exclude national politics and crime.`,
+        search_queries: [
+          'Cornwall CT news events announcements',
+          'Region 1 schools Cornwall Consolidated Housatonic news',
+          'West Cornwall Cornwall Bridge Litchfield County events',
+        ],
+        mode: 'fast',
+        advanced_settings: {
+          max_results: 6,
+        },
+      },
+      parallelKey,
+      6500,
+    ),
+  ]);
 
-    const timeoutPromise = new Promise<null>((resolve) =>
-      setTimeout(() => resolve(null), 12_000),
-    );
-    const interaction = await Promise.race([searchPromise, timeoutPromise]);
-    if (!interaction) {
-      console.warn('[parallel-fallback] Gemini search timed out at 12s; continuing with Chronicle + NWS');
-      return [];
+  const snippets: WebEvidenceSnippet[] = [];
+
+  for (const item of extractRes?.results ?? []) {
+    const excerpt = Array.isArray(item.excerpts)
+      ? item.excerpts.join(' ').slice(0, 500)
+      : String(item.full_content ?? '').slice(0, 500);
+    if (excerpt.trim()) {
+      snippets.push({
+        source: 'parallel-extract',
+        url: String(item.url ?? ''),
+        title: String(item.title ?? item.url ?? 'Local Cornwall Page'),
+        excerpt: excerpt.trim(),
+        publishedAt: item.publish_date ? String(item.publish_date) : undefined,
+      });
     }
-
-    const parsed = JSON.parse(interaction.output_text || '{"items":[]}');
-    return (parsed.items ?? []).map((it: any) => ({
-      source: 'gemini-grounding',
-      url: String(it.url ?? ''),
-      title: String(it.title ?? ''),
-      excerpt: String(it.excerpt ?? '').slice(0, 420),
-    }));
-  } catch (err) {
-    console.warn('[parallel-fallback] Gemini search failed:', err);
-    return [];
   }
+
+  for (const item of searchRes?.results ?? []) {
+    const excerpt = Array.isArray(item.excerpts)
+      ? item.excerpts.join(' ').slice(0, 420)
+      : '';
+    if (excerpt.trim()) {
+      snippets.push({
+        source: 'parallel-search',
+        url: String(item.url ?? ''),
+        title: String(item.title ?? 'Northwest Corner Dispatch'),
+        excerpt: excerpt.trim(),
+        publishedAt: item.publish_date ? String(item.publish_date) : undefined,
+      });
+    }
+  }
+
+  return snippets;
 }
 
 const ARCHETYPE_CRITERIA: Record<ArchetypeId, string> = {
@@ -261,17 +272,16 @@ export async function routeEditionWithDecisions(params: {
     liveWebSnippets: liveEvidence.slice(0, 6),
   };
 
-  // 1. Primary path: Parallel Decisions API (/v1/decisions) — live-web-grounded!
-  const parallelKey = process.env.PARALLEL_API_KEY;
+  const parallelKey = process.env.PARALLEL_API_KEY?.trim();
   if (parallelKey) {
     const questions: Record<string, unknown> = {
       hasUrgentBanner: {
-        type: 'boolean',
+        type: 'noul',
         instructions:
           'Is there an active NWS severe weather warning/advisory, a confirmed Region 1 school closure/snow day, or an extraordinary emergency in Cornwall CT today?',
       },
       hasSchoolDisruption: {
-        type: 'boolean',
+        type: 'noul',
         instructions:
           'Does Region 1 Schools (Cornwall Consolidated School or Housatonic Valley Regional High School) have a snow day, delay, or unscheduled closure today or tomorrow?',
       },
@@ -284,7 +294,7 @@ export async function routeEditionWithDecisions(params: {
 
     if (isMohawkWindowOpen(clock)) {
       questions.isMohawkSkiOpen = {
-        type: 'boolean',
+        type: 'noul',
         instructions:
           'Is Mohawk Mountain Ski Area in Cornwall CT currently open with lift-served skiing/riding trails today?',
       };
@@ -306,7 +316,7 @@ export async function routeEditionWithDecisions(params: {
         questions,
       },
       parallelKey,
-      6500,
+      8500,
     );
 
     if (res?.answers) {
@@ -322,9 +332,17 @@ export async function routeEditionWithDecisions(params: {
         ? (chosenSpot as SeasonalWindowId)
         : fallbackSpotlight;
 
-      const urgentProb = Number(res.answers.hasUrgentBanner?.probability ?? 0);
-      const skiProb = Number(res.answers.isMohawkSkiOpen?.probability ?? 0);
-      const schoolProb = Number(res.answers.hasSchoolDisruption?.probability ?? 0);
+      const urgentProb = Number(
+        res.answers.hasUrgentBanner?.noul ?? res.answers.hasUrgentBanner?.probability ?? 0,
+      );
+      const skiProb = Number(
+        res.answers.isMohawkSkiOpen?.noul ?? res.answers.isMohawkSkiOpen?.probability ?? 0,
+      );
+      const schoolProb = Number(
+        res.answers.hasSchoolDisruption?.noul ??
+          res.answers.hasSchoolDisruption?.probability ??
+          0,
+      );
 
       const citations: WebEvidenceSnippet[] = (res.citations ?? []).map((c: any) => ({
         source: 'parallel-decisions',
@@ -347,69 +365,6 @@ export async function routeEditionWithDecisions(params: {
         },
         citations,
       };
-    }
-  }
-
-  // 2. Fallback path when PARALLEL_API_KEY is not set: Gemini Decisions API (gemini-decision-1, v1beta)
-  const geminiKey = process.env.GEMINI_API_KEY;
-  if (geminiKey) {
-    try {
-      const ai = new GoogleGenAI({ apiKey: geminiKey, apiVersion: 'v1beta' });
-      const questions: Record<string, any> = {
-        hasUrgentBanner: {
-          type: 'noul',
-          instructions:
-            'Based on the weather alerts and local snippets, is there an active NWS weather warning/advisory or emergency school closure requiring a top alert banner today?',
-        },
-        archetype: {
-          type: 'choice',
-          instructions: `Choose the best print Archetype for the ${daypart.toUpperCase()} Edition at a public store counter in Cornwall, CT.`,
-          criteria: ARCHETYPE_CRITERIA,
-        },
-      };
-
-      if (hasMultipleSpotlights) {
-        questions.spotlight = {
-          type: 'choice',
-          instructions:
-            'Which eligible seasonal window is the most compelling, accurate Seasonal Spotlight for Cornwall today?',
-          criteria: spotlightCriteria,
-        };
-      }
-
-      const decisionRes = await ai.decisions.create({
-        model: 'gemini-decision-1',
-        input: JSON.stringify(sharedStateSummary),
-        questions,
-      });
-
-      const answers: Record<string, any> = decisionRes.answers ?? {};
-      const chosenArch = String(answers.archetype?.choice ?? fallbackArchetype);
-      const validArch: ArchetypeId =
-        archetypeOverride ??
-        (['broadsheet', 'handbill', 'almanac', 'dispatch', 'poster'].includes(chosenArch)
-          ? (chosenArch as ArchetypeId)
-          : fallbackArchetype);
-
-      const chosenSpot = String(answers.spotlight?.choice ?? fallbackSpotlight);
-      const validSpot: SeasonalWindowId = eligibleWindows.some((w) => w.id === chosenSpot)
-        ? (chosenSpot as SeasonalWindowId)
-        : fallbackSpotlight;
-
-      const urgentProb = Number(answers.hasUrgentBanner?.noul ?? 0);
-
-      return {
-        provider: 'gemini',
-        archetype: validArch,
-        spotlightId: validSpot,
-        hasUrgentBanner: weather.alerts.length > 0 || urgentProb >= 0.75,
-        isMohawkSkiOpen: false,
-        hasSchoolDisruption: false,
-        probabilities: { urgent: urgentProb },
-        citations: [],
-      };
-    } catch (err) {
-      console.warn('[decisions] Gemini Decisions fallback failed:', err);
     }
   }
 

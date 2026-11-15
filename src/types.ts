@@ -123,7 +123,7 @@ export interface WebEvidenceSnippet {
 }
 
 export interface DecisionRoutingResult {
-  provider: 'parallel' | 'gemini' | 'deterministic';
+  provider: 'parallel' | 'deterministic';
   archetype: ArchetypeId;
   spotlightId: SeasonalWindowId;
   hasUrgentBanner: boolean;
@@ -175,6 +175,7 @@ export interface Edition {
   upcomingEvents: UpcomingEventItem[];
   seasonalSpotlight: SeasonalSpotlight;
   almanacFeature: {
+    whenLabel?: string;
     title: string;
     note: string;
   };

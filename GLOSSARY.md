@@ -31,5 +31,3 @@ _Avoid_: Primary story, active stack
 **Almanac**:
 Year-round astronomical and natural-history context for Cornwall—sunrise/sunset, daily daylight delta, moon phase, and seasonal wildlife or flora observations.
 _Avoid_: Sun/moon widget, filler
-
-

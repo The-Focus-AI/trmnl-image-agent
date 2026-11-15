@@ -1,0 +1,26 @@
+# Default TheFocus.AI CI — runs the same mise tasks developers run locally (handbook/release.md, recipes/ci.md).
+# An authorized owner must still enable GitHub branch protection and failure alerting.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+      - run: mise run install
+      - run: mise run lint
+      - run: mise run test
