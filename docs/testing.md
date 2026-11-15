@@ -14,7 +14,7 @@ Offline, credential-free checks run identically locally and in `.github/workflow
 - **Unit & HTTP contract tests (`test`)**: `mise run test` (`vitest run`) verifies:
   - Hard calendar-gated `SeasonalSpotlight` eligibility (`sap-watch`, `mohawk-ski`, `frost-garden`, etc.) in `src/__tests__/seasonal.test.ts`,
   - All 5 `800×480` poster archetypes (`dispatch`, `broadsheet`, `handbill`, `almanac`, `poster`), 15-minute slot rotation, XSS escaping, and `?frame=1` preview controls in `src/__tests__/render.test.ts`,
-  - `/api/health` boolean-only secret reporting (zero value leakage) and `/api/cron` `CRON_SECRET` bearer-token enforcement in `src/__tests__/api.test.ts`.
+  - `/api/health` boolean-only secret reporting (zero value leakage), `/api/cron` `CRON_SECRET` bearer-token enforcement, and `/api/admin` full Parallel data view + history persistence in `src/__tests__/api.test.ts`.
 
 ## Preview verification
 

@@ -4,7 +4,7 @@
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import {
-  existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync,
+  cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync,
   readdirSync, renameSync, rmSync, writeFileSync,
 } from "node:fs";
 import { join, relative } from "node:path";
@@ -17,12 +17,21 @@ export function readLock(path) {
     throw new Error("Expected a version 1 skills-lock.json with a skills object");
   }
   for (const [name, entry] of Object.entries(lock.skills)) {
-    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name) || !entry ||
-        entry.sourceType !== "github" || !/^[\w.-]+\/[\w.-]+$/.test(entry.source) ||
-        entry.sourceUrl || !/^[0-9a-f]{40}$/.test(entry.ref) ||
-        !/^[0-9a-f]{64}$/.test(entry.computedHash) || typeof entry.skillPath !== "string" ||
-        entry.skillPath.split("/").at(-1) !== "SKILL.md" ||
-        entry.skillPath.split("/").some((part) => !part || part === "." || part === ".." || part.includes("\\"))) {
+    const validPath =
+      typeof entry?.skillPath === "string" &&
+      entry.skillPath.split("/").at(-1) === "SKILL.md" &&
+      !entry.skillPath.split("/").some((part) => !part || part === "." || part === ".." || part.includes("\\"));
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name) || !entry || !validPath || !/^[0-9a-f]{64}$/.test(entry.computedHash)) {
+      throw new Error(`${name}: require valid skill name, canonical skillPath and SHA-256 hash`);
+    }
+    if (entry.sourceType === "local") {
+      if (entry.source !== "." || entry.ref || entry.sourceUrl || entry.skillPath !== `.agents/skills/${name}/SKILL.md`) {
+        throw new Error(`${name}: local skills require source ".", no ref/sourceUrl, and skillPath ".agents/skills/${name}/SKILL.md"`);
+      }
+      continue;
+    }
+    if (entry.sourceType !== "github" || !/^[\w.-]+\/[\w.-]+$/.test(entry.source) ||
+        entry.sourceUrl || !/^[0-9a-f]{40}$/.test(entry.ref)) {
       throw new Error(`${name}: require GitHub owner/repo, immutable commit ref, canonical skillPath and SHA-256 hash`);
     }
     if (entry.source === "cursor/plugins" && !entry.skillPath.startsWith("pstack/skills/")) {
@@ -106,15 +115,28 @@ function main() {
       if (extras.length) throw new Error(`Unrecorded installed skills; review before replacing: ${extras.join(", ")}`);
     }
     stage = mkdtempSync(join(agents, "restore-"));
-    writeFileSync(join(stage, "skills-lock.json"), original);
-    if (count) {
+    const githubSkills = Object.fromEntries(
+      Object.entries(lock.skills).filter(([, entry]) => entry.sourceType === "github"),
+    );
+    const localNames = Object.entries(lock.skills)
+      .filter(([, entry]) => entry.sourceType === "local")
+      .map(([name]) => name);
+    const stageLock = { version: 1, skills: githubSkills };
+    writeFileSync(join(stage, "skills-lock.json"), JSON.stringify(stageLock, null, 2));
+    if (Object.keys(githubSkills).length) {
       const result = spawnSync("skills", ["experimental_install"], { cwd: stage, stdio: "inherit" });
       if (result.error || result.status !== 0) throw new Error("skills restore failed; current installation and lock are unchanged");
+      if (!isDeepStrictEqual(readLock(join(stage, "skills-lock.json")), stageLock)) {
+        throw new Error("Restore changed the lock; review an explicit update instead (current lock unchanged)");
+      }
     } else mkdirSync(join(stage, ".agents", "skills"), { recursive: true });
-    if (!isDeepStrictEqual(readLock(join(stage, "skills-lock.json")), lock)) {
-      throw new Error("Restore changed the lock; review an explicit update instead (current lock unchanged)");
-    }
     const candidate = join(stage, ".agents", "skills");
+    mkdirSync(candidate, { recursive: true });
+    for (const name of localNames) {
+      const srcDir = join(installed, name);
+      if (!existsSync(srcDir)) throw new Error(`${name}: missing repo-local skill directory at ${srcDir}`);
+      cpSync(srcDir, join(candidate, name), { recursive: true });
+    }
     verifyInstalled(candidate, lock);
     if (readFileSync(lockPath, "utf8") !== original) throw new Error("Project lock changed during restore; not publishing skills");
     const previous = join(stage, "previous");

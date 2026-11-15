@@ -9,6 +9,7 @@ Serve **The Cornwall Dispatch**, a stateless `800×480` 1-bit e-ink storefront d
 ## Entry Points
 
 - `api/index.ts` (`/` and `/?frame=1`) — `800×480` 1-bit HTML + inline monochrome SVG poster cards
+- `api/admin.ts` (`/admin` and `/api/admin`) — Pressroom Admin full Parallel extraction inspector + persistent high-level run history
 - `api/state.ts` (`/api/state`) — synthesized JSON `StorefrontEdition`
 - `api/chronicle.ts` (`/api/chronicle`) — cached monthly *Cornwall Chronicle* PDF digest
 - `api/cron.ts` (`/api/cron`) — daily Vercel Cron cache warmer (`Authorization: Bearer $CRON_SECRET` when `CRON_SECRET` is set)

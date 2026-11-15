@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@vercel/blob": "^2.9.0",
     "dotenv": "^17.2.3",
     "unpdf": "^2.2.0"
   },

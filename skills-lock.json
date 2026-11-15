@@ -21,6 +21,18 @@
       "sourceType": "github",
       "skillPath": "skills/productivity/grilling/SKILL.md",
       "computedHash": "e40cc1d348f6d935e28f1e24474302d7368f0a400429271a43b35fe154891dc5"
+    },
+    "spec-extract": {
+      "source": ".",
+      "sourceType": "local",
+      "skillPath": ".agents/skills/spec-extract/SKILL.md",
+      "computedHash": "e6bd9483181045ce637968084de72da3dd8484b06cb52a8de96d9964e8795213"
+    },
+    "verify-deploy": {
+      "source": ".",
+      "sourceType": "local",
+      "skillPath": ".agents/skills/verify-deploy/SKILL.md",
+      "computedHash": "8f7ee10e135a8e2bcbbc97cc63bc437e3e330931cb2bd440f914e42c95a0890f"
     }
   }
 }

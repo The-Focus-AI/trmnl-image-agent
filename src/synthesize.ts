@@ -1,4 +1,10 @@
 import {
+  getLatestFullDataView,
+  getStorageStatus,
+  listHistory,
+  recordSynthesisRun,
+} from './history.js';
+import {
   computeDaypart,
   editionTitleForDaypart,
   getCornwallClock,
@@ -6,20 +12,26 @@ import {
   selectRotatingArchetype,
 } from './seasonal.js';
 import { buildAlmanacData } from './sources/almanac.js';
-import { getChronicleDigest } from './sources/chronicle.js';
+import { getChronicleDigestWithMeta } from './sources/chronicle.js';
 import {
-  gatherLiveLocalEvidence,
+  gatherLiveLocalEvidenceDetailed,
   parallelChatJson,
   routeEditionWithDecisions,
 } from './sources/parallel.js';
 import { fetchHousatonicRiver } from './sources/river.js';
 import { fetchCornwallWeather } from './sources/weather.js';
 import type {
+  AdminDataPayload,
   ArchetypeId,
+  ChronicleBrief,
   ChronicleDigest,
   ChronicleEvent,
+  CopySynthesisTrace,
+  DispatchHistoryEntry,
+  DispatchHistoryTrigger,
   Edition,
   EligibleSeasonalCandidate,
+  FullDataView,
   RiverData,
   SeasonalWindowId,
   WeatherData,
@@ -57,6 +69,66 @@ export function filterUpcomingChronicleEvents(
       if (bIso) return 1;
       return 0;
     });
+}
+
+/**
+ * Drops dated meeting/hearing notices whose YYYY-MM-DD date has already passed
+ * (e.g. pre-press Nov 10 hearing when today is Nov 15) and ranks current-month
+ * Cornwall briefs ahead of prior-year retrospectives (`isRetrospective: true`).
+ */
+export function filterCurrentChronicleBriefs(
+  briefs: ChronicleBrief[],
+  todayIso: string,
+): ChronicleBrief[] {
+  return briefs
+    .filter((b) => {
+      const d = (b.eventDate ?? '').trim();
+      if (!b.isRetrospective && /^\d{4}-\d{2}-\d{2}$/.test(d) && d < todayIso) {
+        return false;
+      }
+      return true;
+    })
+    .sort((a, b) => Number(Boolean(a.isRetrospective)) - Number(Boolean(b.isRetrospective)));
+}
+
+/**
+ * Safety net for storefront Broadsheet visibility: `renderTownBulletinPoster`
+ * renders ONLY `kicker`, `headline`, and `deck` (`leadStory.body` is hidden on
+ * `broadsheet`). If `body` cites a prior year (`< currentYear`, e.g. 2024) while
+ * neither `headline` nor `deck` mentions any 4-digit year, surface that year in
+ * `headline` (when room permits) and `deck` so a historical figure is never
+ * misread as current-year breaking news.
+ */
+export function ensureVisibleYearAttribution(
+  leadStory: Edition['leadStory'],
+  currentYear: number,
+): Edition['leadStory'] {
+  const visibleText = `${leadStory.headline} ${leadStory.deck}`;
+  if (/\b(19\d{2}|20\d{2})\b/.test(visibleText)) {
+    return leadStory;
+  }
+
+  const bodyYears = Array.from(
+    leadStory.body.matchAll(/\b(19\d{2}|20\d{2})\b/g),
+    (m) => Number(m[1]),
+  ).filter((y) => Number.isFinite(y) && y < currentYear);
+
+  if (bodyYears.length === 0) {
+    return leadStory;
+  }
+
+  const pastYear = String(bodyYears[0]);
+  const nextHeadline =
+    leadStory.headline.length <= 39
+      ? `${leadStory.headline} (${pastYear})`
+      : leadStory.headline;
+  const nextDeck = clamp(`In ${pastYear}: ${leadStory.deck}`, 92, leadStory.deck);
+
+  return {
+    ...leadStory,
+    headline: nextHeadline,
+    deck: nextDeck,
+  };
 }
 
 function formatEventWhen(dateStr: string, todayIso: string): string {
@@ -101,16 +173,17 @@ const EDITION_COPY_SCHEMA: Record<string, unknown> = {
         headline: {
           type: 'string',
           description:
-            'Punchy, poster-scale Cornwall headline readable from 8 feet away (max 44 chars, ~6-8 words).',
+            'Punchy, poster-scale Cornwall headline readable from 8 feet away (max 44 chars, ~6-8 words). Shown WITHOUT body on Broadsheet — if referencing a prior-year award/election/stat (e.g. 2024), include that year in headline or deck.',
         },
         deck: {
           type: 'string',
-          description: 'One crisp supporting sentence with concrete Cornwall details (max 88 chars).',
+          description:
+            'One crisp self-contained supporting sentence with concrete Cornwall details and exact year/date context if not current (max 88 chars). Shown directly beneath headline on Broadsheet (where body is hidden).',
         },
         body: {
           type: 'string',
           description:
-            'Short second sentence only if needed for Special Poster context (max 110 chars).',
+            'Optional second sentence rendered ONLY on the Special Poster archetype (NEVER displayed on Broadsheet — never tuck crucial qualifiers like a prior year "2024" exclusively inside body; max 110 chars).',
         },
       },
       required: ['kicker', 'headline', 'deck', 'body'],
@@ -325,16 +398,24 @@ function buildFallbackEditionCopy(params: {
 // Warm-instance cache (30 min) for synthesized content; active poster rotates every 15m!
 const editionCache = new Map<
   string,
-  { expiresAt: number; leadArchetype: ArchetypeId; edition: Edition }
+  {
+    expiresAt: number;
+    leadArchetype: ArchetypeId;
+    edition: Edition;
+    fullView: FullDataView;
+  }
 >();
 
-export async function buildStorefrontEdition(options?: {
+export async function buildStorefrontFullView(options?: {
   now?: Date;
   archetypeOverride?: string | null;
   daypartOverride?: string | null;
   requestOrigin?: string;
   forceRefresh?: boolean;
-}): Promise<Edition> {
+  forceChronicleRefresh?: boolean;
+  trigger?: DispatchHistoryTrigger;
+}): Promise<FullDataView> {
+  const totalStartedAt = Date.now();
   const now = options?.now ?? new Date();
   const clock = getCornwallClock(now);
   const daypart = computeDaypart(clock, options?.daypartOverride);
@@ -356,20 +437,29 @@ export async function buildStorefrontEdition(options?: {
       Boolean(cached.edition.alertBanner),
     );
     return {
-      ...cached.edition,
-      archetype: validArchOverride ?? rotatingArch,
+      ...cached.fullView,
+      edition: {
+        ...cached.edition,
+        archetype: validArchOverride ?? rotatingArch,
+      },
     };
   }
 
   const almanac = buildAlmanacData(now, daypart);
 
   // Step 1: Parallel data gathering across NWS, USGS, Cornwall Chronicle (24h cached), and Parallel Live Web
-  const [weather, river, chronicle, liveEvidence] = await Promise.all([
+  const [weather, river, chronicleTrace, liveEvidenceDetailed] = await Promise.all([
     fetchCornwallWeather(),
     fetchHousatonicRiver(),
-    getChronicleDigest(options?.requestOrigin),
-    gatherLiveLocalEvidence(clock),
+    getChronicleDigestWithMeta(
+      options?.requestOrigin,
+      Boolean(options?.forceChronicleRefresh),
+    ),
+    gatherLiveLocalEvidenceDetailed(clock),
   ]);
+
+  const chronicle = chronicleTrace.digest;
+  const liveEvidence = liveEvidenceDetailed.snippets;
 
   // Step 2: Hard Calendar Seasonal Windows in TypeScript (ADR 0003)
   const eligibleWindows = getEligibleSeasonalWindows(clock, weather, river);
@@ -377,6 +467,17 @@ export async function buildStorefrontEdition(options?: {
     chronicle?.events ?? [],
     clock.dateIso,
   );
+  const activeChronicleBriefs = filterCurrentChronicleBriefs(
+    chronicle?.briefs ?? [],
+    clock.dateIso,
+  );
+  const filteredChronicle: ChronicleDigest | null = chronicle
+    ? {
+        ...chronicle,
+        events: upcomingChronicleEvents,
+        briefs: activeChronicleBriefs,
+      }
+    : null;
 
   // Step 3: Route Archetype + Seasonal Spotlight + Live Status Checks via Decisions API
   const routing = await routeEditionWithDecisions({
@@ -385,9 +486,7 @@ export async function buildStorefrontEdition(options?: {
     weather,
     river,
     eligibleWindows,
-    chronicle: chronicle
-      ? { ...chronicle, events: upcomingChronicleEvents }
-      : null,
+    chronicle: filteredChronicle,
     liveEvidence,
     archetypeOverride: validArchOverride,
   });
@@ -400,7 +499,7 @@ export async function buildStorefrontEdition(options?: {
     weather,
     river,
     almanacPhenology: almanac.phenologyNote,
-    chronicle,
+    chronicle: filteredChronicle,
     upcomingChronicleEvents,
     winningWindow,
     hasUrgentBanner: routing.hasUrgentBanner,
@@ -409,12 +508,22 @@ export async function buildStorefrontEdition(options?: {
   // Step 4: Single structured Parallel Chat pass to craft authentic storefront broadsheet copy
   const parallelKey = process.env.PARALLEL_API_KEY?.trim();
   let synthesized = fallbackCopy;
+  const snippetsSentToSynthesis = [...liveEvidence, ...routing.citations].slice(0, 8);
+  const copyTrace: CopySynthesisTrace = {
+    provider: 'fallback',
+    model: parallelKey ? 'lite' : 'deterministic-fallback',
+    elapsedMs: 0,
+    contextChars: 0,
+    rawOutput: null,
+  };
 
   if (parallelKey) {
+    const copyStartedAt = Date.now();
     try {
       const contextPayload = {
         todayDate: almanac.fullDateLabel,
         todayIso: clock.dateIso,
+        currentYear: clock.year,
         daypart,
         editionTitle: editionTitleForDaypart(daypart, clock),
         chosenArchetype: routing.archetype,
@@ -444,10 +553,13 @@ export async function buildStorefrontEdition(options?: {
         },
         chronicleIssue: chronicle?.issueLabel ?? null,
         upcomingChronicleEvents: upcomingChronicleEvents.slice(0, 10),
-        chronicleBriefs: chronicle?.briefs ?? [],
+        chronicleBriefs: activeChronicleBriefs,
         chronicleNatureAndLore: chronicle?.natureAndLore ?? [],
-        liveLocalWebDispatches: [...liveEvidence, ...routing.citations].slice(0, 8),
+        liveLocalWebDispatches: snippetsSentToSynthesis,
       };
+
+      const serializedContext = JSON.stringify(contextPayload).slice(0, 16_500);
+      copyTrace.contextChars = serializedContext.length;
 
       const systemPrompt = `You are the editor of THE CORNWALL DISPATCH, a witty, warm, literary black-and-white storefront broadsheet displayed publicly at a shop counter in Cornwall, Connecticut (Litchfield Hills). Synthesize ONLY the provided JSON context without additional web searches.`;
 
@@ -456,25 +568,36 @@ export async function buildStorefrontEdition(options?: {
 2. STOREFRONT BOUNDARY: Never include national partisan politics, gruesome crime, or private household-chore commands (never say "cover your plants" or "plan school logistics"). Speak to neighbors, hikers, anglers, and visitors standing at the store counter.
 3. DAYPART FOCUS (${daypart.toUpperCase()}):
    - morning: Lead with today's Cornwall sky, town pulse, and what's ahead today.
-   - midday: Spotlight an intriguing Cornwall Chronicle brief, local curiosity, or afternoon/evening program.
+   - midday: Spotlight an intriguing current Cornwall Chronicle brief, local curiosity, or afternoon/evening program.
    - evening: Pivot toward tonight's chill/weather, tomorrow's outlook, and upcoming community gatherings.
    - weekend: Highlight weekend outings, trails, Housatonic River / Mohawk conditions, fairs, talks, and markets.
 4. STRICT SEASONAL TRUTH: Your Seasonal Spotlight MUST strictly describe winningSeasonalWindow (${winningWindow.id}: ${winningWindow.label}). NEVER mention maple sap/sugaring unless winningSeasonalWindow.id is "maple_sap". If winningSeasonalWindow.id is "mohawk_ski" and isMohawkSkiOpen is false, frame it as early-winter snowmaking/pre-season mountain watch rather than claiming trails are open.
 5. CHRONOLOGICAL ACCURACY & NOTABLE CALENDAR: Only list upcoming events on or after ${clock.dateIso} (format whenLabel cleanly, e.g. TODAY, TUE NOV 17, SAT NOV 28). Exclude routine administrative Zoom/board meetings (Board of Selectmen, Board of Finance, P&Z, ZBA) unless it is the Annual Town Meeting. For almanacFeature, spotlight the single most notable upcoming Cornwall gathering on the calendar (never generic wildlife trivia).
+6. CARD VISIBILITY & TEMPORAL TRUTH (TODAY IS ${clock.dateIso}, YEAR ${clock.year}):
+   - On the Broadsheet storefront card, ONLY leadStory.kicker, leadStory.headline, and leadStory.deck are rendered — leadStory.body is HIDDEN (rendered only on the Special Poster card). headline + deck MUST stand on their own and NEVER hide essential qualifiers exclusively inside leadStory.body.
+   - Prefer current ${clock.year} Cornwall civic developments and upcoming town events over retrospective essays (isRetrospective: true). NEVER frame a prior-year election turnout, award, or statistic (e.g. 2024 or 2025) as current ${clock.year} news — whenever citing a prior-year figure or honor in leadStory or dispatches, state that exact 4-digit year directly in headline or deck.
 
 SOURCE CONTEXT JSON:
-${JSON.stringify(contextPayload).slice(0, 16_500)}`;
+${serializedContext}`;
 
-      const raw = await parallelChatJson<any>({
+      const copyReq = {
         systemPrompt,
         userPrompt: editorialPrompt,
         schemaName: 'edition_copy',
         schema: EDITION_COPY_SCHEMA,
-        model: 'lite',
-        timeoutMs: 22_000,
-      });
+        model: 'lite' as const,
+        timeoutMs: 32_000,
+      };
+
+      let raw = await parallelChatJson<any>(copyReq);
+      if (!raw && Date.now() - totalStartedAt < 38_000) {
+        raw = await parallelChatJson<any>({ ...copyReq, timeoutMs: 18_000 });
+      }
+      copyTrace.elapsedMs = Date.now() - copyStartedAt;
 
       if (raw) {
+        copyTrace.provider = 'parallel';
+        copyTrace.rawOutput = raw as Record<string, unknown>;
         const bannerRaw = clamp(raw.alertBanner, 54);
         synthesized = {
           alertBanner: routing.hasUrgentBanner && bannerRaw ? bannerRaw : null,
@@ -588,9 +711,15 @@ ${JSON.stringify(contextPayload).slice(0, 16_500)}`;
         }
       }
     } catch (err) {
+      copyTrace.elapsedMs = Date.now() - copyStartedAt;
       console.error('[synthesize] Parallel copy synthesis failed, using fallback:', err);
     }
   }
+
+  synthesized = {
+    ...synthesized,
+    leadStory: ensureVisibleYearAttribution(synthesized.leadStory, clock.year),
+  };
 
   const activeRotatingArch = selectRotatingArchetype(
     clock,
@@ -598,8 +727,11 @@ ${JSON.stringify(contextPayload).slice(0, 16_500)}`;
     Boolean(synthesized.alertBanner),
   );
 
+  const generatedAt = now.toISOString();
+  const totalElapsedMs = Date.now() - totalStartedAt;
+
   const built: Edition = {
-    generatedAt: now.toISOString(),
+    generatedAt,
     dateLabel: `${almanac.weekdayShort}, ${almanac.monthDayLabel}`,
     editionLabel: editionTitleForDaypart(daypart, clock),
     volumeLabel: 'CORNWALL VILLAGE • WEST CORNWALL • CORNWALL BRIDGE',
@@ -615,13 +747,122 @@ ${JSON.stringify(contextPayload).slice(0, 16_500)}`;
     },
   };
 
+  const fullView: FullDataView = {
+    capturedAt: generatedAt,
+    totalElapsedMs,
+    parallelConfigured: Boolean(parallelKey),
+    leadArchetype: routing.archetype,
+    edition: built,
+    eligibleWindows,
+    upcomingChronicleEvents,
+    parallel: {
+      extract: liveEvidenceDetailed.extract,
+      search: liveEvidenceDetailed.search,
+      chronicle: chronicleTrace,
+      decisions: routing,
+      copySynthesis: copyTrace,
+      snippetsSentToSynthesis,
+    },
+  };
+
   if (!options?.now) {
     editionCache.set(cacheKey, {
       expiresAt: Date.now() + 30 * 60 * 1000,
       leadArchetype: routing.archetype,
       edition: built,
+      fullView,
+    });
+
+    const historyEntry: DispatchHistoryEntry = {
+      id: `${generatedAt}-${daypart}`,
+      timestamp: generatedAt,
+      trigger: options?.trigger ?? (options?.forceRefresh ? 'admin-refresh' : 'live-miss'),
+      dateLabel: built.dateLabel,
+      editionLabel: built.editionLabel,
+      daypart,
+      leadArchetype: routing.archetype,
+      spotlightId: built.seasonalSpotlight.windowId,
+      decisionProvider: routing.provider,
+      copyProvider: copyTrace.provider,
+      headline: built.leadStory.headline,
+      alertBanner: built.alertBanner,
+      weatherSummary: `${weather.currentTempF}°F ${weather.conditions} (H:${weather.highF}° L:${weather.lowF}°)`,
+      riverSummary:
+        river.dischargeCfs !== null
+          ? `${river.dischargeCfs} CFS (${river.statusLabel})`
+          : river.statusLabel,
+      chronicleIssue: built.routingMeta.chronicleIssue,
+      counts: {
+        extractedPages: liveEvidenceDetailed.extract.results.length,
+        searchHits: liveEvidenceDetailed.search.results.length,
+        decisionCitations: routing.citations.length,
+        chronicleEvents: chronicle?.events.length ?? 0,
+        chronicleBriefs: chronicle?.briefs.length ?? 0,
+      },
+      elapsedMs: totalElapsedMs,
+    };
+
+    await recordSynthesisRun(historyEntry, fullView).catch((err) => {
+      console.warn('[synthesize] Failed to persist history entry:', err);
     });
   }
 
-  return built;
+  return fullView;
+}
+
+export async function buildStorefrontEdition(options?: {
+  now?: Date;
+  archetypeOverride?: string | null;
+  daypartOverride?: string | null;
+  requestOrigin?: string;
+  forceRefresh?: boolean;
+  trigger?: DispatchHistoryTrigger;
+}): Promise<Edition> {
+  const fullView = await buildStorefrontFullView(options);
+  return fullView.edition;
+}
+
+export async function buildAdminDataPayload(options?: {
+  requestOrigin?: string;
+  forceRefresh?: boolean;
+  forceChronicleRefresh?: boolean;
+  daypartOverride?: string | null;
+}): Promise<AdminDataPayload> {
+  let currentView: FullDataView | null = null;
+
+  if (!options?.forceRefresh && !options?.daypartOverride) {
+    const clock = getCornwallClock(new Date());
+    const daypart = computeDaypart(clock);
+    const warm = editionCache.get(`${clock.dateIso}:${daypart}`);
+    if (warm && warm.expiresAt > Date.now()) {
+      currentView = warm.fullView;
+    } else {
+      const persisted = await getLatestFullDataView();
+      if (persisted) {
+        const ageMs = Date.now() - Date.parse(persisted.capturedAt);
+        if (Number.isFinite(ageMs) && ageMs < 60 * 60 * 1000) {
+          currentView = persisted;
+        }
+      }
+    }
+  }
+
+  if (!currentView) {
+    currentView = await buildStorefrontFullView({
+      requestOrigin: options?.requestOrigin,
+      forceRefresh: Boolean(options?.forceRefresh),
+      forceChronicleRefresh: Boolean(options?.forceChronicleRefresh),
+      daypartOverride: options?.daypartOverride,
+      trigger: options?.forceRefresh ? 'admin-refresh' : 'live-miss',
+    });
+  }
+
+  const history = await listHistory(50);
+
+  return {
+    generatedAt: new Date().toISOString(),
+    storage: getStorageStatus(),
+    currentView,
+    history,
+  };
 }

@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { createServer } from 'node:http';
+import { GET as handleAdminGet, POST as handleAdminPost } from '../api/admin.js';
 import { GET as handleChronicle } from '../api/chronicle.js';
 import { GET as handleCron } from '../api/cron.js';
 import { GET as handleHealth } from '../api/health.js';
@@ -8,12 +9,25 @@ import { GET as handleState } from '../api/state.js';
 
 const port = Number(process.env.PORT ?? 3000);
 
+async function readRequestBody(req: import('node:http').IncomingMessage): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
+
 const server = createServer(async (req, res) => {
   const origin = `http://localhost:${port}`;
   const fullUrl = new URL(req.url ?? '/', origin);
+  const method = (req.method ?? 'GET').toUpperCase();
+  const hasBody = method !== 'GET' && method !== 'HEAD';
+  const bodyBuf = hasBody ? await readRequestBody(req) : undefined;
+
   const webReq = new Request(fullUrl.toString(), {
-    method: req.method ?? 'GET',
+    method,
     headers: req.headers as HeadersInit,
+    ...(bodyBuf && bodyBuf.length > 0 ? { body: new Uint8Array(bodyBuf) } : {}),
   });
 
   try {
@@ -23,6 +37,11 @@ const server = createServer(async (req, res) => {
       case '/api':
       case '/api/index':
         webRes = await handleIndex(webReq);
+        break;
+      case '/admin':
+      case '/api/admin':
+        webRes =
+          method === 'POST' ? await handleAdminPost(webReq) : await handleAdminGet(webReq);
         break;
       case '/api/chronicle':
         webRes = await handleChronicle();
@@ -64,6 +83,7 @@ server.listen(port, () => {
   console.log(`\n📰 THE CORNWALL DISPATCH local server listening:`);
   console.log(`   • Raw 800×480 (TRMNL Screenshot target): http://localhost:${port}/`);
   console.log(`   • Interactive Archetype Preview Frame:   http://localhost:${port}/?frame=1`);
+  console.log(`   • Pressroom Admin & Full Data View:      http://localhost:${port}/admin`);
   console.log(`   • Synthesized JSON State:                http://localhost:${port}/api/state`);
   console.log(`   • Cornwall Chronicle PDF Digest:         http://localhost:${port}/api/chronicle\n`);
 });

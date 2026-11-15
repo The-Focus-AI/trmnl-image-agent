@@ -156,4 +156,43 @@ describe('800x480 Room-Readable Single-Focus Posters (ADR 0002)', () => {
     expect(html).toContain('preview-mode eink-sim');
     expect(html).toContain('archetype=handbill');
   });
+
+  it('enforces >= 14px font-size floor and >= 2.5px SVG stroke-width floor across all 5 raw posters', () => {
+    const archetypes: ArchetypeId[] = ['dispatch', 'broadsheet', 'handbill', 'almanac', 'poster'];
+    for (const arch of archetypes) {
+      const ed = makeFixtureEdition(arch);
+      if (arch === 'dispatch') {
+        // Exercise both max and min callouts (minIdx > 1) and precipitation bars
+        ed.weather.hourly = ed.weather.hourly.map((pt, idx) => ({
+          ...pt,
+          tempF: 48 - idx * 2,
+          precipPct: idx === 4 ? 45 : pt.precipPct,
+        }));
+      }
+      const html = renderEditionHtml(ed);
+      const screenCss = html.split('\n  .screen {')[1]?.split('</style>')[0] ?? '';
+      const bodyMarkup = html.split('<body')[1] ?? '';
+
+      const cssFontSizes = [
+        ...screenCss.matchAll(/font-size:\s*([0-9.]+)px/g),
+        ...bodyMarkup.matchAll(/font-size:\s*([0-9.]+)px/g),
+        ...bodyMarkup.matchAll(/font-size="([0-9.]+)"/g),
+      ].map((m) => Number(m[1]));
+
+      expect(cssFontSizes.length).toBeGreaterThan(0);
+      for (const px of cssFontSizes) {
+        expect(px, `${arch} font-size ${px}px must be >= 14px`).toBeGreaterThanOrEqual(14);
+      }
+
+      const svgStrokeWidths = [...bodyMarkup.matchAll(/stroke-width="([0-9.]+)"/g)].map((m) =>
+        Number(m[1]),
+      );
+      if (arch !== 'poster') {
+        expect(svgStrokeWidths.length).toBeGreaterThan(0);
+      }
+      for (const sw of svgStrokeWidths) {
+        expect(sw, `${arch} stroke-width ${sw} must be >= 2.5`).toBeGreaterThanOrEqual(2.5);
+      }
+    }
+  });
 });

@@ -9,6 +9,11 @@ import type {
   Daypart,
   DecisionRoutingResult,
   EligibleSeasonalCandidate,
+  ParallelExtractedPage,
+  ParallelExtractFailure,
+  ParallelExtractTrace,
+  ParallelSearchHit,
+  ParallelSearchTrace,
   RiverData,
   SeasonalWindowId,
   WeatherData,
@@ -19,6 +24,8 @@ const PARALLEL_BASE = 'https://api.parallel.ai';
 
 const CORNWALL_CORE_URLS = [
   'https://www.cornwallct.gov/',
+  'https://cornwallct.org/',
+  'https://cornwalllibrary.org/events/',
   'https://cornwalllibrary.org/',
   'https://cornwallconservationtrust.org/',
   'https://hughesmemorialunion.com/',
@@ -27,36 +34,51 @@ const CORNWALL_CORE_URLS = [
 
 const MOHAWK_URL = 'https://www.mohawkmtn.com/snow-report/';
 
+let chatUsesBearer = false;
+
 export async function postParallelJson<T>(
   path: string,
   body: Record<string, unknown>,
   apiKey: string,
   timeoutMs = 10_000,
 ): Promise<T | null> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    let res = await fetch(`${PARALLEL_BASE}${path}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
+  const isChat = path.includes('/chat/completions');
+  const preferBearer = isChat && (chatUsesBearer || apiKey.startsWith('pak_'));
+  const serializedBody = JSON.stringify(body);
 
-    // Accommodate pak_* Personal Access Keys if an endpoint expects Bearer auth
-    if (res.status === 401 && path.includes('/chat/completions')) {
-      res = await fetch(`${PARALLEL_BASE}${path}`, {
+  const attemptFetch = async (useBearer: boolean): Promise<Response> => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(`${PARALLEL_BASE}${path}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(body),
+        headers: useBearer
+          ? {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${apiKey}`,
+            }
+          : {
+              'Content-Type': 'application/json',
+              'x-api-key': apiKey,
+            },
+        body: serializedBody,
         signal: controller.signal,
       });
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  try {
+    let res = await attemptFetch(preferBearer);
+
+    // Accommodate pak_* or key-type auth differences with a fresh timeout budget
+    if (res.status === 401 && isChat) {
+      const nextUseBearer = !preferBearer;
+      res = await attemptFetch(nextUseBearer);
+      if (res.ok) {
+        chatUsesBearer = nextUseBearer;
+      }
     }
 
     if (!res.ok) {
@@ -66,10 +88,12 @@ export async function postParallelJson<T>(
     }
     return (await res.json()) as T;
   } catch (err) {
-    console.warn(`[parallel] ${path} error:`, err);
+    const reason =
+      err instanceof Error && err.name === 'AbortError'
+        ? `timed out after ${timeoutMs}ms`
+        : err;
+    console.warn(`[parallel] ${path} error:`, reason);
     return null;
-  } finally {
-    clearTimeout(timer);
   }
 }
 
@@ -127,80 +151,198 @@ export async function parallelChatJson<T>(params: {
   }
 }
 
-export async function gatherLiveLocalEvidence(
-  clock: LocalClock,
-): Promise<WebEvidenceSnippet[]> {
-  const parallelKey = process.env.PARALLEL_API_KEY?.trim();
-  if (!parallelKey) return [];
-
+export async function gatherLiveLocalEvidenceDetailed(clock: LocalClock): Promise<{
+  snippets: WebEvidenceSnippet[];
+  extract: ParallelExtractTrace;
+  search: ParallelSearchTrace;
+}> {
   const urls = isMohawkWindowOpen(clock)
     ? [...CORNWALL_CORE_URLS, MOHAWK_URL]
     : CORNWALL_CORE_URLS;
 
-  const [extractRes, searchRes] = await Promise.all([
+  const extractObjective = `Extract current ${clock.dateIso} community announcements, upcoming events, library/market programs, school schedule alerts, and ski trail status for Cornwall, Connecticut.`;
+  const searchObjective = `Find recent local community news, road/bridge notices, outdoor conditions, and cultural events in Cornwall CT, Region 1 Schools, and Litchfield County around ${clock.dateIso}. Exclude national politics and crime.`;
+  const searchQueries = [
+    'Cornwall CT news events announcements',
+    'Region 1 schools Cornwall Consolidated Housatonic news',
+    'West Cornwall Cornwall Bridge Litchfield County events',
+  ];
+
+  const parallelKey = process.env.PARALLEL_API_KEY?.trim();
+  if (!parallelKey) {
+    return {
+      snippets: [],
+      extract: {
+        attempted: false,
+        ok: false,
+        elapsedMs: 0,
+        urls,
+        objective: extractObjective,
+        results: [],
+        failedResults: [],
+      },
+      search: {
+        attempted: false,
+        ok: false,
+        elapsedMs: 0,
+        objective: searchObjective,
+        searchQueries,
+        results: [],
+      },
+    };
+  }
+
+  const extractStart = Date.now();
+  const searchStart = Date.now();
+  const sessionId = `cornwall-dispatch-${clock.dateIso}-${clock.hour}`;
+
+  const [extractOutcome, searchOutcome] = await Promise.all([
     postParallelJson<any>(
       '/v1/extract',
       {
         urls,
-        objective: `Extract current ${clock.dateIso} community announcements, upcoming events, library/market programs, school schedule alerts, and ski trail status for Cornwall, Connecticut.`,
+        objective: extractObjective,
+        search_queries: [
+          'Cornwall CT upcoming events calendar schedule',
+          'community announcements notices closures library town hall',
+          'trail conditions snow report market',
+        ],
+        session_id: sessionId,
         advanced_settings: {
+          excerpt_settings: {
+            max_chars_per_result: 3000,
+          },
+          fetch_policy: {
+            max_age_seconds: 3600,
+            timeout_seconds: 8,
+          },
           full_content: false,
         },
       },
       parallelKey,
-      8500,
-    ),
+      11_000,
+    ).then((res) => ({ res, elapsedMs: Date.now() - extractStart })),
     postParallelJson<any>(
       '/v1/search',
       {
-        objective: `Find recent local community news, road/bridge notices, outdoor conditions, and cultural events in Cornwall CT, Region 1 Schools, and Litchfield County around ${clock.dateIso}. Exclude national politics and crime.`,
-        search_queries: [
-          'Cornwall CT news events announcements',
-          'Region 1 schools Cornwall Consolidated Housatonic news',
-          'West Cornwall Cornwall Bridge Litchfield County events',
-        ],
+        objective: searchObjective,
+        search_queries: searchQueries,
+        session_id: sessionId,
         mode: 'fast',
         advanced_settings: {
           max_results: 6,
         },
       },
       parallelKey,
-      6500,
-    ),
+      8000,
+    ).then((res) => ({ res, elapsedMs: Date.now() - searchStart })),
   ]);
 
+  const extractRes = extractOutcome.res;
+  const searchRes = searchOutcome.res;
+
   const snippets: WebEvidenceSnippet[] = [];
+  const extractedPages: ParallelExtractedPage[] = [];
+  const failedResults: ParallelExtractFailure[] = [];
 
   for (const item of extractRes?.results ?? []) {
-    const excerpt = Array.isArray(item.excerpts)
-      ? item.excerpts.join(' ').slice(0, 500)
-      : String(item.full_content ?? '').slice(0, 500);
+    const rawExcerpts: string[] = Array.isArray(item.excerpts)
+      ? item.excerpts
+          .map((e: unknown) => String(e ?? '').trim())
+          .filter(Boolean)
+      : [];
+    const fullContentStr = item.full_content ? String(item.full_content).trim() : '';
+    const pageUrl = String(item.url ?? '');
+    const pageTitle = String(item.title ?? item.url ?? 'Local Cornwall Page');
+    const publishedAt = item.publish_date ? String(item.publish_date) : undefined;
+
+    extractedPages.push({
+      url: pageUrl,
+      title: pageTitle,
+      publishedAt,
+      excerpts: rawExcerpts,
+      ...(fullContentStr ? { fullContentPreview: fullContentStr.slice(0, 2000) } : {}),
+    });
+
+    const excerpt =
+      rawExcerpts.length > 0
+        ? rawExcerpts.join(' ').slice(0, 500)
+        : fullContentStr.slice(0, 500);
     if (excerpt.trim()) {
       snippets.push({
         source: 'parallel-extract',
-        url: String(item.url ?? ''),
-        title: String(item.title ?? item.url ?? 'Local Cornwall Page'),
+        url: pageUrl,
+        title: pageTitle,
         excerpt: excerpt.trim(),
-        publishedAt: item.publish_date ? String(item.publish_date) : undefined,
+        publishedAt,
       });
     }
   }
 
+  for (const fail of extractRes?.errors ?? extractRes?.failed_results ?? []) {
+    const statusSuffix = fail?.http_status_code ? ` (HTTP ${fail.http_status_code})` : '';
+    failedResults.push({
+      url: String(fail?.url ?? ''),
+      error: `${String(fail?.error ?? fail?.error_type ?? 'Extraction failed')}${statusSuffix}`,
+    });
+  }
+
+  const searchHits: ParallelSearchHit[] = [];
   for (const item of searchRes?.results ?? []) {
-    const excerpt = Array.isArray(item.excerpts)
-      ? item.excerpts.join(' ').slice(0, 420)
-      : '';
+    const rawExcerpts: string[] = Array.isArray(item.excerpts)
+      ? item.excerpts
+          .map((e: unknown) => String(e ?? '').trim())
+          .filter(Boolean)
+      : [];
+    const hitUrl = String(item.url ?? '');
+    const hitTitle = String(item.title ?? 'Northwest Corner Dispatch');
+    const publishedAt = item.publish_date ? String(item.publish_date) : undefined;
+
+    searchHits.push({
+      url: hitUrl,
+      title: hitTitle,
+      publishedAt,
+      excerpts: rawExcerpts,
+    });
+
+    const excerpt = rawExcerpts.join(' ').slice(0, 420);
     if (excerpt.trim()) {
       snippets.push({
         source: 'parallel-search',
-        url: String(item.url ?? ''),
-        title: String(item.title ?? 'Northwest Corner Dispatch'),
+        url: hitUrl,
+        title: hitTitle,
         excerpt: excerpt.trim(),
-        publishedAt: item.publish_date ? String(item.publish_date) : undefined,
+        publishedAt,
       });
     }
   }
 
+  return {
+    snippets,
+    extract: {
+      attempted: true,
+      ok: Boolean(extractRes),
+      elapsedMs: extractOutcome.elapsedMs,
+      urls,
+      objective: extractObjective,
+      results: extractedPages,
+      failedResults,
+    },
+    search: {
+      attempted: true,
+      ok: Boolean(searchRes),
+      elapsedMs: searchOutcome.elapsedMs,
+      objective: searchObjective,
+      searchQueries,
+      results: searchHits,
+    },
+  };
+}
+
+export async function gatherLiveLocalEvidence(
+  clock: LocalClock,
+): Promise<WebEvidenceSnippet[]> {
+  const { snippets } = await gatherLiveLocalEvidenceDetailed(clock);
   return snippets;
 }
 
@@ -309,6 +451,7 @@ export async function routeEditionWithDecisions(params: {
       };
     }
 
+    const startedAt = Date.now();
     const res = await postParallelJson<any>(
       '/v1/decisions',
       {
@@ -318,6 +461,7 @@ export async function routeEditionWithDecisions(params: {
       parallelKey,
       8500,
     );
+    const elapsedMs = Date.now() - startedAt;
 
     if (res?.answers) {
       const chosenArch = String(res.answers.archetype?.choice ?? fallbackArchetype);
@@ -348,7 +492,7 @@ export async function routeEditionWithDecisions(params: {
         source: 'parallel-decisions',
         url: String(c.url ?? ''),
         title: String(c.title ?? 'Verified Web Source'),
-        excerpt: Array.isArray(c.excerpts) ? c.excerpts.join(' ').slice(0, 350) : '',
+        excerpt: Array.isArray(c.excerpts) ? c.excerpts.join(' ').slice(0, 800) : '',
       }));
 
       return {
@@ -364,6 +508,9 @@ export async function routeEditionWithDecisions(params: {
           schoolDisruption: schoolProb,
         },
         citations,
+        elapsedMs,
+        questionsAsked: questions,
+        rawAnswers: res.answers as Record<string, unknown>,
       };
     }
   }
@@ -377,5 +524,7 @@ export async function routeEditionWithDecisions(params: {
     hasSchoolDisruption: false,
     probabilities: {},
     citations: [],
+    elapsedMs: 0,
+    rawAnswers: null,
   };
 }

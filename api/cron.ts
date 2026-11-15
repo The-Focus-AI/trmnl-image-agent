@@ -65,6 +65,7 @@ export async function GET(request: Request): Promise<Response> {
   const edition = await buildStorefrontEdition({
     requestOrigin: url.origin,
     forceRefresh: true,
+    trigger: 'cron',
   });
 
   return Response.json(

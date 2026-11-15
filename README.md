@@ -34,6 +34,7 @@ mise run dev
 ### Local Preview URLs
 - **Raw `800×480` TRMNL Screenshot target:** `http://localhost:3000/`
 - **Interactive bezel + 1-bit e-ink threshold simulator:** `http://localhost:3000/?frame=1`
+- **Pressroom Admin (full Parallel data view + run history):** `http://localhost:3000/admin` (`?format=json` for raw JSON)
 - **Pin a specific poster or daypart:** `http://localhost:3000/?frame=1&archetype=dispatch&daypart=morning`
 - **Inspect synthesized JSON state:** `http://localhost:3000/api/state`
 - **Inspect parsed monthly *Cornwall Chronicle* PDF digest:** `http://localhost:3000/api/chronicle`
@@ -52,6 +53,11 @@ pnpm dlx vercel
 # Add secrets to Vercel Production
 pnpm dlx vercel env add PARALLEL_API_KEY production
 pnpm dlx vercel env add CRON_SECRET production
+
+# Optional: Persist /admin run history across cold starts (connect Upstash Redis OR Vercel Blob in Vercel Storage, or set manually)
+pnpm dlx vercel env add UPSTASH_REDIS_REST_URL production
+pnpm dlx vercel env add UPSTASH_REDIS_REST_TOKEN production
+# (Alternative: pnpm dlx vercel env add BLOB_READ_WRITE_TOKEN production)
 
 # Deploy production
 pnpm dlx vercel --prod

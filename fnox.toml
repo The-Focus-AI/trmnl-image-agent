@@ -16,4 +16,17 @@ provider = "op"
 value = "CRON_SECRET"
 description = "Shared bearer secret authenticating Vercel Cron GET /api/cron"
 
+# Optional cloud store env vars (injected by Vercel Storage or .env; no 1Password lookup unless added to vault)
+[secrets.UPSTASH_REDIS_REST_URL]
+if_missing = "ignore"
+description = "Optional Upstash Redis REST URL for persistent /admin run history on Vercel"
+
+[secrets.UPSTASH_REDIS_REST_TOKEN]
+if_missing = "ignore"
+description = "Optional Upstash Redis REST token for persistent /admin run history on Vercel"
+
+[secrets.BLOB_READ_WRITE_TOKEN]
+if_missing = "ignore"
+description = "Optional Vercel Blob read-write token (alternative to Upstash Redis for /admin run history)"
+
 [profiles.runtime]

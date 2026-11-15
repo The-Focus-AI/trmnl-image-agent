@@ -148,7 +148,7 @@ export const DISPATCH_STYLES = `
 
   /* =========================================================================
      CORE 800x480 ROOM-READABLE POSTER CANVAS
-     Minimum font floor: 13.5px bold tags | 17-20px body | 23-72px headlines & heroes
+     Minimum font floor: 14px bold tags | 17-20px body | 23-76px headlines & heroes
      ========================================================================= */
   .screen {
     width: 800px;
@@ -249,7 +249,7 @@ export const DISPATCH_STYLES = `
     color: #000000;
     font-family: var(--font-cond);
     font-weight: 800;
-    font-size: 13.5px;
+    font-size: 14px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     padding: 1.5px 8px;

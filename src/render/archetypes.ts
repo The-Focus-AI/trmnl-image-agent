@@ -284,19 +284,19 @@ function renderSpecialPoster(ed: Edition): string {
 
       <footer style="border:3px solid #000;padding:10px 14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;font-family:var(--font-mono);">
         <div>
-          <div style="font-size:13.5px;font-weight:700;">NOW IN CORNWALL</div>
+          <div style="font-size:14px;font-weight:700;">NOW IN CORNWALL</div>
           <div style="font-family:var(--font-cond);font-weight:800;font-size:24px;line-height:1.05;" class="clamp-1">
             ${ed.weather.currentTempF}°F ${escapeHtml(ed.weather.conditions.split(' ').slice(0, 2).join(' '))}
           </div>
         </div>
         <div style="border-left:2px solid #000;padding-left:12px;">
-          <div style="font-size:13.5px;font-weight:700;">TODAY RANGE</div>
+          <div style="font-size:14px;font-weight:700;">TODAY RANGE</div>
           <div style="font-family:var(--font-cond);font-weight:800;font-size:26px;line-height:1.05;">
             HIGH ${ed.weather.highF}° / LOW ${ed.weather.lowF}°
           </div>
         </div>
         <div style="border-left:2px solid #000;padding-left:12px;">
-          <div style="font-size:13.5px;font-weight:700;">HOUSATONIC</div>
+          <div style="font-size:14px;font-weight:700;">HOUSATONIC</div>
           <div style="font-family:var(--font-cond);font-weight:800;font-size:26px;line-height:1.05;">
             ${escapeHtml(riverCfs)}
           </div>
@@ -352,6 +352,7 @@ function renderPreviewToolbar(ed: Edition, einkSim: boolean): string {
     </div>
     <div class="preview-group">
       <a class="preview-link ${einkSim ? 'active' : ''}" href="${toggleEinkHref}">1-Bit E-Ink Sim: ${einkSim ? 'ON' : 'OFF'}</a>
+      <a class="preview-link" href="/admin">Admin Data</a>
       <a class="preview-link" href="/">Raw 800×480</a>
     </div>
   </nav>`;

@@ -15,11 +15,16 @@ export async function GET(request: Request): Promise<Response> {
     archetypeOverride || daypartOverride || previewFrame || forceRefresh,
   );
 
+  const isCronWarmer = (request.headers.get('user-agent') ?? '').includes(
+    'CornwallDispatch-CronWarmer',
+  );
+
   const edition = await buildStorefrontEdition({
     archetypeOverride,
     daypartOverride,
     requestOrigin: url.origin,
     forceRefresh,
+    trigger: isCronWarmer ? 'cron' : forceRefresh ? 'admin-refresh' : 'live-miss',
   });
 
   const html = renderEditionHtml(edition, { previewFrame, einkSim });

@@ -1,0 +1,103 @@
+{
+  "verifiedAt": "2026-11-15T21:21:00Z",
+  "specVersion": 2,
+  "mode": "mode-1-passive-plus-live-vercel-production-browser-verification",
+  "gitHead": "3b52e0e+dirty",
+  "deployment": "https://trmnl-image-agent-555p0313w-thefocusai.vercel.app",
+  "productionAlias": "https://trmnl-image-agent.vercel.app",
+  "summary": {
+    "criteria": {
+      "pass": 5,
+      "fail": 0,
+      "inconclusive": 0,
+      "waived": 0
+    },
+    "invariants": {
+      "pass": 6,
+      "fail": 0,
+      "inconclusive": 0,
+      "waived": 0
+    }
+  },
+  "criteriaVerdicts": [
+    {
+      "id": "AC-1",
+      "criterion": "GET /admin returns HTTP 200 HTML (Cache-Control: private, no-store) and GET /admin?format=json returns HTTP 200 JSON exposing the active storefront edition, Parallel web extract and search results, Cornwall Chronicle PDF extraction trace, Decisions routing probabilities and citations, synthesized copy slots (distinguishing Broadsheet-visible lead copy from Poster-only body copy), upstream sensor and almanac feeds, and recorded run history while escaping untrusted HTML and leaking zero secret or token values.",
+      "verdict": "pass",
+      "evidence": "Verified via Vitest (src/__tests__/admin.test.ts, 4/4 passing), in-process HTTP contract drill (XSS <script> & <img onerror> escaped; zero secret leakage), and host-verified browser audit on live https://trmnl-image-agent.vercel.app/admin and /admin?format=json (BROWSER_HOST_FACTS visited_origins: https://trmnl-image-agent.vercel.app) confirming HTTP 200 across all 8 sections (#history, #decisions, #extract, #search, #chronicle, #copy, #upstream, #raw-json), 'POSTER BODY ONLY (hidden on Broadsheet card)' badge, valid JSON export, and zero exposed tokens.",
+      "proposal": null
+    },
+    {
+      "id": "AC-2",
+      "criterion": "POST /api/admin triggers a fresh synthesis pass (clearing and re-parsing the cached Cornwall Chronicle PDF digest when refreshChronicle=1 is submitted), records a run-history entry persisted via Upstash Redis REST (UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN) or Vercel Blob (BLOB_READ_WRITE_TOKEN) when configured or local disk fallback otherwise, and responds with HTTP 303 redirecting to /admin.",
+      "verdict": "pass",
+      "evidence": "Verified in api/admin.ts:41-77, src/history.ts:72-180, src/__tests__/admin.test.ts:364-415 (Upstash /pipeline Bearer POST + 303 redirect), and live browser submission of 'Re-Extract & Synthesize' (+PDF checked) on https://trmnl-image-agent.vercel.app/admin redirecting back to /admin and recording an ADMIN REFRESH entry (trigger: 'admin-refresh', status: 'ok', durationMs: 37609) in #history.",
+      "proposal": null
+    },
+    {
+      "id": "AC-3",
+      "criterion": "Monthly Cornwall Chronicle discovery and ingestion request all discovered issue and insert PDFs through Parallel POST /v1/extract (falling back to local page-by-page PDF parsing only on upstream crawl failure) to populate GET /api/chronicle and storefront upcoming events strictly on or after the current Cornwall date while excluding past dates, routine municipal board or Zoom meetings, and wildlife trivia.",
+      "verdict": "pass",
+      "evidence": "Verified in src/sources/chronicle.ts:204-235 & :345-557, src/__tests__/seasonal.test.ts:125-167, mocked POST /v1/extract contract drill, and live production /admin refresh extracting pdfUrls ['https://cornwallchronicle.org/wp-content/uploads/November_2026.pdf', 'https://cornwallchronicle.org/wp-content/uploads/InsertCCFINAL.pdf'] ('unpdf (29,790 chars) • parallel-extract (271 chars)') into 36 upcoming events (from 60 extracted) and 16 town briefs.",
+      "proposal": null
+    },
+    {
+      "id": "AC-4",
+      "criterion": "Expired dated hearing and meeting notices are excluded from town briefs, current-month briefs take precedence over retrospective lookbacks, and whenever a lead story references a prior-year statistic or award (such as 2024 election turnout) in its body copy, that 4-digit year appears visibly in the broadsheet poster's rendered headline or deck rather than solely in Poster-only body text.",
+      "verdict": "pass",
+      "evidence": "Verified in src/synthesize.ts:79-132 (filterCurrentChronicleBriefs + ensureVisibleYearAttribution), src/__tests__/seasonal.test.ts:196-315 (rendering 'Cornwall Tops State in Voter Turnout (2024)' + 'In 2024: Democracy Cup honors 90.46% turnout…' when a 2024 brief leads), and live https://trmnl-image-agent.vercel.app/?archetype=broadsheet prioritizing current November civic news ('Town Meeting Sets Cornwall's Next Moves — CCS hosts the Nov 20 meeting on capital plans, veterans' tax relief and the Annual Town…') ahead of the retrospective 2024 lookback.",
+      "proposal": null
+    },
+    {
+      "id": "AC-5",
+      "criterion": "GET / renders self-contained 800x480 black-and-white HTML across all five archetype values (dispatch, broadsheet, handbill, almanac, poster) with Cache-Control: public, s-maxage=900, stale-while-revalidate=86400 on default requests (private, no-store when query overrides are present), GET /api/cron tags scheduled warm-ups in run history while enforcing CRON_SECRET when set, and fnox --profile runtime check succeeds without 1Password warnings when optional cloud-storage variables are unprovisioned.",
+      "verdict": "pass",
+      "evidence": "Host-verified browser audit at 800x480 on https://trmnl-image-agent.vercel.app confirmed scrollWidth=800, scrollHeight=480, and 0 bezel/toolbar elements across /, /?archetype=dispatch, /?archetype=broadsheet, /?archetype=handbill, /?archetype=almanac, and /?archetype=poster; in-process HTTP drill confirmed Cache-Control headers and GET /api/cron 401/200 + trigger='cron' history recording; and 'fnox --non-interactive --profile runtime check' exited 0 with zero warnings.",
+      "proposal": null
+    }
+  ],
+  "invariantFindings": [
+    {
+      "id": "INV-1",
+      "invariant": "100% Parallel Web Systems & Zero Pre-Gemini-4 Models (AGENTS.md, ADR 0001)",
+      "verdict": "pass",
+      "evidence": "grep -rnE '@google/genai|GEMINI_API_KEY|gemini-[123]\\.' src/ api/ package.json returned 0 matches; live /admin confirmed decisionProvider='parallel' (/v1/decisions in 561 ms).",
+      "proposal": null
+    },
+    {
+      "id": "INV-2",
+      "invariant": "Secret Isolation, Boolean-Only Health Endpoint & Single pnpm Lockfile (AGENTS.md)",
+      "verdict": "pass",
+      "evidence": ".env, .fnox/env, logs/dispatch-history.json, and logs/chronicle-cache.json verified gitignored and untracked; pnpm-lock.yaml is the sole lockfile; live https://trmnl-image-agent.vercel.app/api/health returned {\"ok\":true,\"service\":\"cornwall-dispatch\",\"configured\":{\"parallelApiKey\":true,\"cronSecret\":true}}.",
+      "proposal": null
+    },
+    {
+      "id": "INV-3",
+      "invariant": "Reproducible Install & Locked Skills CI Gate (AGENTS.md, .github/workflows/ci.yml:24)",
+      "verdict": "pass",
+      "evidence": "Recorded SHA-256 hashes for repo-local spec-extract and verify-deploy in skills-lock.json and updated scripts/restore-skills.mjs; 'mise run install' exited 0 ('Verified 5 installed skills against their recorded hashes') and 'mise run lint' exited 0 ('Validated 5 immutable skill entries').",
+      "proposal": null
+    },
+    {
+      "id": "INV-4",
+      "invariant": "800x480 Zero-Overflow Geometry, >=14px Minimum Typography & >=2.5px SVG Strokes (docs/testing.md:30-31, ADR 0002)",
+      "verdict": "pass",
+      "evidence": "Updated src/render/styles.ts, src/render/archetypes.ts, and src/render/svg.ts, added regression guard in src/__tests__/render.test.ts (25/25 Vitest passing), and verified via live Chromium DOM inspection at 800x480 across all 5 archetypes on https://trmnl-image-agent.vercel.app: scrollWidth=800, scrollHeight=480, minComputedFontSize=14px across all 5 posters, and minSvgStrokeWidth=2.5px..3.1px.",
+      "proposal": null
+    },
+    {
+      "id": "INV-5",
+      "invariant": "Hard Calendar Seasonal Gates Before Parallel Decisions (ADR 0003)",
+      "verdict": "pass",
+      "evidence": "Verified in src/seasonal.ts, src/__tests__/seasonal.test.ts (12/12 passing), and live Nov 15 /admin routing selecting 'winter_hearth' (maple_sap, mohawk_ski, and farmers_market gated out on Nov 15).",
+      "proposal": null
+    },
+    {
+      "id": "INV-6",
+      "invariant": "Live Production Deployment Parity at https://trmnl-image-agent.vercel.app (docs/verify/spec.md Scenario Guidance)",
+      "verdict": "pass",
+      "evidence": "Deployed trmnl-image-agent-555p0313w-thefocusai.vercel.app aliased to https://trmnl-image-agent.vercel.app and verified live via host-observed browser session (final_step_38.png): /api/health -> 200, /admin -> 200 + live Re-Extract & Synthesize recorded ADMIN REFRESH, /admin?format=json -> 200 JSON, and all 5 raw posters render at 800x480 with current Nov 20 Town Meeting copy.",
+      "proposal": null
+    }
+  ]
+}

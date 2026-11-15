@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { renderEditionHtml } from '../render/archetypes.js';
 import {
   computeDaypart,
   filterSeasonalWindowIds,
@@ -7,8 +8,12 @@ import {
   selectRotatingArchetype,
 } from '../seasonal.js';
 import { buildAlmanacData } from '../sources/almanac.js';
-import { filterUpcomingChronicleEvents } from '../synthesize.js';
-import type { ChronicleEvent } from '../types.js';
+import {
+  ensureVisibleYearAttribution,
+  filterCurrentChronicleBriefs,
+  filterUpcomingChronicleEvents,
+} from '../synthesize.js';
+import type { ChronicleBrief, ChronicleEvent } from '../types.js';
 
 describe('Calendar-gated Seasonal Windows (ADR 0003)', () => {
   it('NEVER allows maple_sap on Nov 15 even during ideal freeze-thaw temps', () => {
@@ -184,5 +189,134 @@ describe('Cornwall Astronomical Almanac Math', () => {
     );
     expect(new Set(seen).size).toBe(4);
     expect(seen[0]).toBe('dispatch');
+  });
+});
+
+describe('Temporal Brief Filtering & Broadsheet Visible-Year Attribution', () => {
+  it('filters out expired dated hearing notices and ranks current briefs ahead of retrospectives', () => {
+    const briefs: ChronicleBrief[] = [
+      {
+        headline: 'P&Z Hearing Continues Nov 10',
+        detail: 'Special permit hearing continues Nov 10 on Zoom.',
+        eventDate: '2026-11-10',
+        isRetrospective: false,
+      },
+      {
+        headline: 'Cornwall Recorded 90.46% Turnout in 2024',
+        detail: 'Looking back at the 2024 Democracy Cup small-town award.',
+        eventDate: '',
+        isRetrospective: true,
+      },
+      {
+        headline: 'Town Pays Off School & Garage Bonds Early',
+        detail: 'Board of Finance retires final $1.55M bond issue ahead of schedule.',
+        eventDate: '',
+        isRetrospective: false,
+      },
+      {
+        headline: 'Town Meeting Set for Nov 20',
+        detail: 'Voters convene at Town Hall Friday evening.',
+        eventDate: '2026-11-20',
+        isRetrospective: false,
+      },
+    ];
+
+    const filtered = filterCurrentChronicleBriefs(briefs, '2026-11-15');
+    expect(filtered.map((b) => b.headline)).toEqual([
+      'Town Pays Off School & Garage Bonds Early',
+      'Town Meeting Set for Nov 20',
+      'Cornwall Recorded 90.46% Turnout in 2024',
+    ]);
+  });
+
+  it('surfaces prior-year context (e.g. 2024) onto Broadsheet headline + deck when tucked inside hidden body', () => {
+    const rawLead = {
+      kicker: 'CIVIC PRIDE',
+      headline: 'Cornwall Tops State in Voter Turnout',
+      deck: 'Democracy Cup honors 90.46% turnout, highest among CT small towns.',
+      body: "Cornwall won the Democracy Cup in the small-town category for 90.46% voter turnout in the 2024 election, highest among Connecticut's small towns. Tonight: Partly Cloudy, low around 33°F.",
+    };
+
+    const attributed = ensureVisibleYearAttribution(rawLead, 2026);
+    expect(attributed.headline).toBe('Cornwall Tops State in Voter Turnout (2024)');
+    expect(attributed.deck).toContain('In 2024:');
+    expect(attributed.deck).toContain('90.46% turnout');
+
+    // Verify the rendered Broadsheet poster HTML visibly displays "2024" even though leadStory.body is not rendered on Broadsheet
+    const alm = buildAlmanacData(new Date('2026-11-15T18:00:00Z'), 'weekend');
+    const html = renderEditionHtml({
+      generatedAt: '2026-11-15T18:00:00Z',
+      dateLabel: 'SUN, NOV 15',
+      editionLabel: 'SUNDAY DISPATCH',
+      volumeLabel: 'CORNWALL VILLAGE • WEST CORNWALL • CORNWALL BRIDGE',
+      daypart: 'weekend',
+      archetype: 'broadsheet',
+      alertBanner: null,
+      leadStory: attributed,
+      weatherCallout: { summaryLine: 'Partly sunny', lookaheadLine: 'Low 33°F' },
+      dispatches: [
+        { kicker: 'TOWN', headline: 'Bonds Paid Early', body: 'Town debt retired.' },
+        { kicker: 'LIBRARY', headline: 'New Director Named', body: 'Cara Johnson appointed.' },
+        { kicker: 'RIVER', headline: '640 CFS', body: 'Clear wading.' },
+      ],
+      upcomingEvents: [
+        { whenLabel: 'FRI NOV 20', title: 'Town Meeting', whereAndTime: 'Town Hall • 7:30 PM' },
+      ],
+      seasonalSpotlight: {
+        windowId: 'frost_watch',
+        kicker: 'FROST WATCH',
+        headline: '33° Valley Chill',
+        metric: '45° / 33°',
+        body: 'Frost in hollows.',
+      },
+      almanacFeature: {
+        whenLabel: 'FRI NOV 20',
+        title: 'Town Meeting',
+        note: 'Town Hall • 7:30 PM',
+      },
+      weather: {
+        fetchedAt: '2026-11-15T18:00:00Z',
+        currentTempF: 43,
+        conditions: 'Partly Sunny',
+        wind: 'NW 8 mph',
+        highF: 45,
+        lowF: 33,
+        todayPrecipPct: 0,
+        tonightPrecipPct: 0,
+        todaySummary: 'Partly sunny',
+        tonightSummary: 'Partly cloudy, low 33',
+        tomorrowSummary: 'Sunny',
+        hourly: [],
+        periods: [],
+        alerts: [],
+      },
+      river: {
+        siteName: 'Housatonic River',
+        siteCode: '01199000',
+        dischargeCfs: 640,
+        gageHeightFt: 2.8,
+        waterTempF: 44,
+        statusLabel: 'IDEAL WADING',
+        anglerNote: 'Clear pocket water.',
+        observedAt: '2026-11-15T18:00:00Z',
+      },
+      almanac: alm,
+      routingMeta: { decisionProvider: 'parallel', chronicleIssue: 'NOVEMBER 2026' },
+    });
+
+    expect(html).toContain('Cornwall Tops State in Voter Turnout (2024)');
+    expect(html).toContain('In 2024: Democracy Cup honors 90.46% turnout');
+    // Confirm Broadsheet really omits leadStory.body (which is why visible attribution is required)
+    expect(html).not.toContain('Tonight: Partly Cloudy, low around 33°F.');
+  });
+
+  it('leaves leadStory untouched when headline or deck already names a year or body has no past year', () => {
+    const alreadyClear = {
+      kicker: 'CIVIC NOTE',
+      headline: '2024 Turnout Remembered Ahead of Vote',
+      deck: 'Lyme defends the 2025 Democracy Cup as small towns tally ballots.',
+      body: 'Cornwall posted 90.46% turnout in 2024.',
+    };
+    expect(ensureVisibleYearAttribution(alreadyClear, 2026)).toEqual(alreadyClear);
   });
 });

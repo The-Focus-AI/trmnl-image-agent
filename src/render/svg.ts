@@ -11,7 +11,7 @@ export function escapeHtml(str: unknown): string {
 
 /**
  * Room-readable 1-bit (#000 / #fff) 12-hour temperature curve + bold hatched precip bars.
- * Designed for 7.5" 800x480 e-ink: >=14px mono labels, 4px curve stroke, 2px grid rules.
+ * Designed for 7.5" 800x480 e-ink: >=14px mono labels, 4px curve stroke, >=2.5px grid rules.
  */
 export function renderHourlyChartSvg(
   hourly: HourlyPoint[],
@@ -22,7 +22,7 @@ export function renderHourlyChartSvg(
   const pts = hourly.slice(0, 12);
   if (pts.length < 2) {
     return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
-      <rect x="1" y="1" width="${width - 2}" height="${height - 2}" fill="#fff" stroke="#000" stroke-width="2"/>
+      <rect x="1.5" y="1.5" width="${width - 3}" height="${height - 3}" fill="#fff" stroke="#000" stroke-width="2.5"/>
       <text x="${width / 2}" y="${height / 2 + 6}" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-weight="700" font-size="16" fill="#000">FORECAST CURVE UPDATING</text>
     </svg>`;
   }
@@ -64,7 +64,7 @@ export function renderHourlyChartSvg(
       const bx = padLeft + i * colW + 4;
       const bw = Math.max(10, colW - 8);
       const by = padTop + plotH - barH;
-      return `<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bw.toFixed(1)}" height="${barH.toFixed(1)}" fill="url(#hatch-${idSuffix})" stroke="#000" stroke-width="2"/>`;
+      return `<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bw.toFixed(1)}" height="${barH.toFixed(1)}" fill="url(#hatch-${idSuffix})" stroke="#000" stroke-width="2.5"/>`;
     })
     .join('\n');
 
@@ -82,7 +82,7 @@ export function renderHourlyChartSvg(
       const cy = yAt(p.tempF).toFixed(1);
       const isKey = i === maxIdx || i === minIdx || i % 3 === 0;
       return isKey
-        ? `<circle cx="${cx}" cy="${cy}" r="5.5" fill="#000" stroke="#fff" stroke-width="2"/>`
+        ? `<circle cx="${cx}" cy="${cy}" r="5.5" fill="#000" stroke="#fff" stroke-width="2.5"/>`
         : `<circle cx="${cx}" cy="${cy}" r="3" fill="#000"/>`;
     })
     .join('\n');
@@ -98,8 +98,8 @@ export function renderHourlyChartSvg(
     `<rect x="${(maxX - 22).toFixed(1)}" y="${(maxY - 15).toFixed(1)}" width="44" height="19" rx="3" fill="#000"/>`,
     `<text x="${maxX.toFixed(1)}" y="${(maxY - 1).toFixed(1)}" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-weight="700" font-size="14" fill="#fff">${pts[maxIdx].tempF}°</text>`,
     showMinCallout
-      ? `<rect x="${(minX - 20).toFixed(1)}" y="${(minY - 14).toFixed(1)}" width="40" height="18" fill="#fff" stroke="#000" stroke-width="2"/>
-         <text x="${minX.toFixed(1)}" y="${(minY - 1).toFixed(1)}" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-weight="700" font-size="13" fill="#000">${pts[minIdx].tempF}°</text>`
+      ? `<rect x="${(minX - 21).toFixed(1)}" y="${(minY - 15).toFixed(1)}" width="42" height="19" fill="#fff" stroke="#000" stroke-width="2.5"/>
+         <text x="${minX.toFixed(1)}" y="${(minY - 1).toFixed(1)}" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-weight="700" font-size="14" fill="#000">${pts[minIdx].tempF}°</text>`
       : '',
   ].join('\n');
 
@@ -117,9 +117,9 @@ export function renderHourlyChartSvg(
     <text x="${padLeft - 10}" y="${padTop + 5}" text-anchor="end" font-family="'IBM Plex Mono', monospace" font-size="14" font-weight="700" fill="#000">${maxT}°</text>
     <text x="${padLeft - 10}" y="${padTop + plotH}" text-anchor="end" font-family="'IBM Plex Mono', monospace" font-size="14" font-weight="700" fill="#000">${minT}°</text>
 
-    <!-- Crisp 2px guide lines -->
-    <line x1="${padLeft}" y1="${padTop}" x2="${padLeft + plotW}" y2="${padTop}" stroke="#000" stroke-width="1.5" stroke-dasharray="5,5"/>
-    <line x1="${padLeft}" y1="${midY.toFixed(1)}" x2="${padLeft + plotW}" y2="${midY.toFixed(1)}" stroke="#000" stroke-width="1.5" stroke-dasharray="3,6"/>
+    <!-- Crisp >=2.5px guide lines -->
+    <line x1="${padLeft}" y1="${padTop}" x2="${padLeft + plotW}" y2="${padTop}" stroke="#000" stroke-width="2.5" stroke-dasharray="5,5"/>
+    <line x1="${padLeft}" y1="${midY.toFixed(1)}" x2="${padLeft + plotW}" y2="${midY.toFixed(1)}" stroke="#000" stroke-width="2.5" stroke-dasharray="3,6"/>
     <line x1="${padLeft}" y1="${padTop + plotH}" x2="${padLeft + plotW}" y2="${padTop + plotH}" stroke="#000" stroke-width="2.5"/>
 
     ${precipBars}
@@ -170,7 +170,7 @@ export function renderMoonMedallionSvg(phaseFraction: number, size = 104): strin
       const y1 = cy + r1 * Math.sin(a);
       const x2 = cx + outerR * Math.cos(a);
       const y2 = cy + outerR * Math.sin(a);
-      return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#000" stroke-width="${deg % 90 === 0 ? '3' : '2'}"/>`;
+      return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#000" stroke-width="${deg % 90 === 0 ? '3' : '2.5'}"/>`;
     })
     .join('');
 
@@ -242,12 +242,12 @@ export function renderWeatherGlyphSvg(conditions: string, size = 64): string {
 export function renderCoveredBridgeEmblemSvg(width = 68, height = 28): string {
   return `<svg width="${width}" height="${height}" viewBox="0 0 76 30" xmlns="http://www.w3.org/2000/svg">
     <polygon points="6,12 38,2 70,12" fill="#000"/>
-    <rect x="10" y="12" width="56" height="10" fill="#fff" stroke="#000" stroke-width="2.4"/>
-    <rect x="18" y="14.5" width="7" height="4.5" fill="#000"/>
-    <rect x="34.5" y="14.5" width="7" height="4.5" fill="#000"/>
-    <rect x="51" y="14.5" width="7" height="4.5" fill="#000"/>
+    <rect x="10" y="12" width="56" height="10" fill="#fff" stroke="#000" stroke-width="3.1"/>
+    <rect x="18" y="14.7" width="7" height="4.5" fill="#000"/>
+    <rect x="34.5" y="14.7" width="7" height="4.5" fill="#000"/>
+    <rect x="51" y="14.7" width="7" height="4.5" fill="#000"/>
     <polygon points="3,22 15,22 13,28 3,28" fill="#000"/>
     <polygon points="61,22 73,22 73,28 63,28" fill="#000"/>
-    <path d="M18 26 Q25 23.5 32 26 T46 26 T58 26" fill="none" stroke="#000" stroke-width="2.2"/>
+    <path d="M18 26 Q25 23.5 32 26 T46 26 T58 26" fill="none" stroke="#000" stroke-width="3.1"/>
   </svg>`;
 }
